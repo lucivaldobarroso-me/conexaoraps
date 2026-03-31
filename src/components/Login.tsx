@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LOGIN_BG_PATTERN } from '../constants';
 import { api } from '../services/api';
@@ -18,6 +18,7 @@ const Login: React.FC = () => {
   // Registration fields
   const [regData, setRegData] = useState({
     nomeCompleto: '',
+    email: '',
     cpf: '',
     matricula: '',
     funcao: '',
@@ -26,6 +27,13 @@ const Login: React.FC = () => {
     confirmarSenha: ''
   });
 
+  useEffect(() => {
+    const existingUser = localStorage.getItem('user_info');
+    if (existingUser) {
+      navigate('/dashboard');
+    }
+  }, [navigate]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     setRegData(prev => ({ ...prev, [id]: value }));
@@ -33,6 +41,10 @@ const Login: React.FC = () => {
 
   const validateCpf = (cpf: string) => {
     return cpf.replace(/\D/g, '').length === 11;
+  };
+
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -52,10 +64,13 @@ const Login: React.FC = () => {
       if (data.result === 'success') {
         localStorage.setItem('user_info', JSON.stringify({
           nomeCompleto: data.nomeCompleto,
-          modulo: data.modulo
+          modulo: data.modulo,
+          funcao: data.funcao,
+          matricula: data.matricula,
+          usuario: username.toUpperCase()
         }));
         setSuccess(data.message || 'Login realizado com sucesso!');
-        setTimeout(() => navigate('/dashboard'), 1500);
+        setTimeout(() => navigate('/dashboard'), 800);
       } else {
         setError(data.message || 'Erro ao realizar login');
       }
@@ -81,6 +96,11 @@ const Login: React.FC = () => {
       return;
     }
 
+    if (!validateEmail(regData.email)) {
+      setError("Informe um e-mail válido.");
+      return;
+    }
+
     if (regData.senha !== regData.confirmarSenha) {
       setError("As senhas não coincidem.");
       return;
@@ -95,7 +115,7 @@ const Login: React.FC = () => {
         setTimeout(() => {
           setIsLogin(true);
           setSuccess('');
-        }, 3000);
+        }, 1800);
       } else {
         setError(result.message);
       }
@@ -149,16 +169,16 @@ const Login: React.FC = () => {
           {isLogin ? (
             <form onSubmit={handleLogin} className="flex flex-col gap-4 px-8 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 uppercase" htmlFor="username">Usuário</label>
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 uppercase" htmlFor="username">E-mail</label>
                 <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[20px] text-slate-400 group-focus-within:text-brand-medium transition-colors">person</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[20px] text-slate-400 group-focus-within:text-brand-medium transition-colors">mail</span>
                   <input
                     id="username"
-                    type="text"
+                    type="email"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Seu usuário"
-                    className="w-full h-12 pl-12 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 focus:bg-white dark:focus:bg-slate-900 focus:ring-4 focus:ring-brand-medium/5 outline-none transition-all uppercase font-medium"
+                    placeholder="seuemail@dominio.com"
+                    className="w-full h-12 pl-12 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 focus:bg-white dark:focus:bg-slate-900 focus:ring-4 focus:ring-brand-medium/5 outline-none transition-all font-medium"
                   />
                 </div>
               </div>
@@ -214,6 +234,10 @@ const Login: React.FC = () => {
                     <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="matricula">Matrícula</label>
                     <input id="matricula" value={regData.matricula} onChange={handleInputChange} className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium" />
                   </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="email">E-mail</label>
+                  <input id="email" type="email" value={regData.email} onChange={handleInputChange} className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium" placeholder="seuemail@dominio.com" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="funcao">Função / Cargo</label>

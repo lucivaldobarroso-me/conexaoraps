@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { api } from '../../services/api';
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
@@ -109,8 +110,8 @@ const Sidebar: React.FC = () => {
           <div className="mt-auto"></div>
 
           <button
-            onClick={() => {
-              localStorage.removeItem('user_info');
+            onClick={async () => {
+              await api.logout();
               navigate('/');
             }}
             title={isCollapsed ? 'Sair' : ''}

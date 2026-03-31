@@ -1,4 +1,6 @@
 export interface User {
+  id?: string;
+  usuario?: string;
   nomeCompleto: string;
   matricula: string;
   funcao: string;

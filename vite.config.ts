@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: '0.0.0.0',
     },
-    base: '/ConexaoRaps/',
+    base: '/conexaoraps/',
     plugins: [react()],
     resolve: {
       alias: {
@@ -18,3 +18,4 @@ export default defineConfig(({ mode }) => {
     }
   };
 });
+
