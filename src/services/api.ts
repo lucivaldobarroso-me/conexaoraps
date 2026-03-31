@@ -225,6 +225,32 @@ const clearUserInfo = () => {
   localStorage.removeItem('user_info');
 };
 
+const readStoredUserInfo = (): User | null => {
+  try {
+    const raw = localStorage.getItem('user_info');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.nomeCompleto) return null;
+    return parsed as User;
+  } catch {
+    return null;
+  }
+};
+
+const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), ms);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 const fetchUsuarioProfile = async (authUserId: string) => {
   const { data, error } = await supabase
     .from('usuarios')
@@ -275,15 +301,23 @@ export const api = {
       const email = String(usuario ?? '').includes('@')
         ? String(usuario).trim().toLowerCase()
         : buildAuthEmail(usuario);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: senha
-      });
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email,
+          password: senha
+        }),
+        12000,
+        'Tempo esgotado ao conectar com o Supabase.'
+      );
 
       if (error) throw error;
       if (!data.user) throw new Error('Usuário não autenticado.');
 
-      const profile = await ensureUsuarioProfile(data.user);
+      const profile = await withTimeout(
+        ensureUsuarioProfile(data.user),
+        12000,
+        'Tempo esgotado ao carregar o perfil do usuário.'
+      );
 
       return {
         result: 'success',
@@ -349,7 +383,11 @@ export const api = {
 
   restaurarSessaoUsuario: async () => {
     try {
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error } = await withTimeout(
+        supabase.auth.getSession(),
+        8000,
+        'Tempo esgotado ao verificar a sessão do Supabase.'
+      );
       if (error) throw error;
 
       if (!data.session?.user) {
@@ -357,9 +395,15 @@ export const api = {
         return null;
       }
 
-      return await ensureUsuarioProfile(data.session.user);
+      return await withTimeout(
+        ensureUsuarioProfile(data.session.user),
+        8000,
+        'Tempo esgotado ao restaurar o perfil do usuário.'
+      );
     } catch (e) {
       console.error('Erro ao restaurar sessão do Supabase:', e);
+      const cachedUser = readStoredUserInfo();
+      if (cachedUser) return cachedUser;
       clearUserInfo();
       return null;
     }

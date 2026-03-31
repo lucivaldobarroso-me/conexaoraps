@@ -19,24 +19,35 @@ const App: React.FC = () => {
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     const bootstrapAuth = async () => {
-      const user = await api.restaurarSessaoUsuario();
-      setAuthenticated(!!user);
-      setAuthReady(true);
+      try {
+        const user = await api.restaurarSessaoUsuario();
+        if (!isMounted) return;
+        setAuthenticated(!!user);
+      } finally {
+        if (isMounted) setAuthReady(true);
+      }
     };
 
-    bootstrapAuth();
+    void bootstrapAuth();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        const user = await api.restaurarSessaoUsuario();
-        setAuthenticated(!!user);
-      } else {
-        setAuthenticated(false);
-      }
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      void (async () => {
+        if (!isMounted) return;
+
+        if (session?.user) {
+          const user = await api.restaurarSessaoUsuario();
+          if (isMounted) setAuthenticated(!!user);
+        } else if (isMounted) {
+          setAuthenticated(false);
+        }
+      })();
     });
 
     return () => {
+      isMounted = false;
       authListener.subscription.unsubscribe();
     };
   }, []);
