@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { GoogleMap, MarkerF, HeatmapLayerF, useJsApiLoader } from '@react-google-maps/api';
+import { GOOGLE_MAPS_API_KEY } from '../../constants';
 
 const containerStyle = {
     width: '100%',
@@ -14,6 +15,7 @@ const center = {
 
 interface MapProps {
     data: any[];
+    occurrenceDetails?: Record<string, any>;
 }
 
 const libraries: ("places" | "visualization")[] = ['places', 'visualization'];
@@ -37,10 +39,10 @@ const HEALTH_UNITS = {
     ]
 };
 
-const MapComponent: React.FC<MapProps> = ({ data }) => {
+const MapComponent: React.FC<MapProps> = ({ data, occurrenceDetails = {} }) => {
     const { isLoaded, loadError } = useJsApiLoader({
         id: 'google-map-script',
-        googleMapsApiKey: "AIzaSyBWQmTwPhctTH66wTRaiPUsmGaf6rpyRqE",
+        googleMapsApiKey: GOOGLE_MAPS_API_KEY,
         libraries,
         language: 'pt-BR',
         region: 'br'
@@ -117,14 +119,22 @@ const MapComponent: React.FC<MapProps> = ({ data }) => {
                 // --- LOGIC: SELECT COLOR ---
                 const nome = r[1];
                 const isReincidente = r[12] === 'Sim' || (freqMap[nome] || 0) > 3;
+                const occurrence = occurrenceDetails[r[0]] || {};
+                const motivoConstatado = String(occurrence.motivoConstatado || '').toUpperCase();
 
                 const med = r[13]; // Medicação (Sim/Não)
                 const fam = r[15]; // Apoio Familiar (Sim/Não)
                 const raps = r[17]; // Apoio RAPS (Sim/Não)
 
                 let markerIcon = icons.patient.green; // Default: Stable
+                const isPsiquiatricoCritico = [
+                    'TENTATIVA DE SUICÍDIO',
+                    'IDEAÇÃO SUICIDA',
+                    'SURTO PSICÓTICO',
+                    'AGITAÇÃO PSICOMOTORA'
+                ].includes(motivoConstatado);
 
-                if (isReincidente && raps === 'Não') {
+                if (isPsiquiatricoCritico || (isReincidente && raps === 'Não')) {
                     // CADEIA 1: Cenário Crítico (VERMELHO) - Porta Giratória
                     markerIcon = icons.patient.red;
                 } else if (!isReincidente && (med === 'Não' || fam === 'Não')) {
@@ -152,12 +162,16 @@ const MapComponent: React.FC<MapProps> = ({ data }) => {
                         reinc: r[12],
                         raps: r[17],
                         med: r[13],
-                        fam: r[15]
+                        fam: r[15],
+                        motivoInicial: occurrence.motivoInicial || '-',
+                        motivoConstatado: occurrence.motivoConstatado || '-',
+                        metodo: occurrence.metodo || '-',
+                        detalheLivre: occurrence.detalheLivre || '-'
                     }
                 };
             })
             .filter((m): m is { id: string, lat: number, lng: number, title: string, iconUrl: string, fullData: any } => m !== null);
-    }, [data]);
+    }, [data, occurrenceDetails]);
 
     const heatmapData = useMemo(() => {
         if (!window.google || !isLoaded) return [];
@@ -181,7 +195,7 @@ const MapComponent: React.FC<MapProps> = ({ data }) => {
 
     return (
         <div className="relative w-full h-full">
-            <div className="absolute top-4 right-4 z-10 bg-white p-2 rounded shadow-md flex gap-2">
+            <div className="absolute top-4 right-4 z-10 flex gap-2 rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-lg backdrop-blur-sm">
                 <button onClick={() => setShowHeatmap(false)} className={`px-3 py-1 rounded text-xs font-bold ${!showHeatmap ? 'bg-[#003366] text-white' : 'bg-gray-200 text-gray-600'}`}>📍 Pinos</button>
                 <button onClick={() => setShowHeatmap(true)} className={`px-3 py-1 rounded text-xs font-bold ${showHeatmap ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'}`}>🔥 Calor</button>
             </div>
@@ -260,7 +274,17 @@ const MapComponent: React.FC<MapProps> = ({ data }) => {
                             <p><span className="font-semibold text-gray-800">Bairro:</span> {selectedMarker.fullData.bairro}</p>
                             <p><span className="font-semibold text-gray-800">Diagnóstico:</span> {selectedMarker.fullData.diag}</p>
                             <p><span className="font-semibold text-gray-800">Reincidente:</span> {selectedMarker.fullData.reinc}</p>
+                            <p><span className="font-semibold text-gray-800">Motivo Inicial:</span> {selectedMarker.fullData.motivoInicial}</p>
+                            <p><span className="font-semibold text-gray-800">Motivo Constatado:</span> {selectedMarker.fullData.motivoConstatado}</p>
+                            {selectedMarker.fullData.metodo !== '-' && (
+                                <p><span className="font-semibold text-gray-800">Método:</span> {selectedMarker.fullData.metodo}</p>
+                            )}
                         </div>
+                        {selectedMarker.fullData.detalheLivre !== '-' && (
+                            <div className="mt-3 pt-2 border-t border-gray-100 text-xs text-gray-600">
+                                <span className="font-semibold text-gray-800">Detalhe Livre:</span> {selectedMarker.fullData.detalheLivre}
+                            </div>
+                        )}
                         <div className="mt-3 pt-2 border-t border-gray-100 text-xs text-gray-500">
                             {selectedMarker.lat.toFixed(5)}, {selectedMarker.lng.toFixed(5)}
                         </div>

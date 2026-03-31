@@ -47,6 +47,17 @@ export interface DashboardData {
   dadosBrutos: any[][];
 }
 
+export interface OccurrenceDashboardData {
+  totalClassificacoes: number;
+  totalCriticos: number;
+  comDetalheLivre: number;
+  motivosIniciais: Record<string, number>;
+  motivosConstatados: Record<string, number>;
+  metodosTentativa: Record<string, number>;
+  transicoes: Record<string, number>;
+  zonasMotivoConstatado: Record<string, number>;
+}
+
 export interface KPIStats {
   label: string;
   value: string;

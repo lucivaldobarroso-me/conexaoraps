@@ -1,0 +1,118 @@
+-- =========================================================
+-- CONEXAO RAPS
+-- POLICIES TEMPORARIAS PARA FRONTEND PUBLICO
+-- ambiente de migracao / copia de trabalho
+-- =========================================================
+
+-- Observacao:
+-- Estas policies liberam o acesso necessario para o app funcionar
+-- com a publishable key no frontend.
+-- Sao policies abertas para acelerar a migracao nesta copia.
+-- Depois podemos endurecer isso com autenticacao real.
+
+grant usage on schema public to anon, authenticated;
+
+grant select on public.zonas to anon, authenticated;
+grant select on public.bairros to anon, authenticated;
+grant select on public.tipos_ocorrencia to anon, authenticated;
+grant select on public.subtipos_ocorrencia to anon, authenticated;
+grant select on public.campos_extras_ocorrencia to anon, authenticated;
+grant select, insert, delete on public.atendimentos_raps to anon, authenticated;
+grant select, insert, update on public.classificacao_ocorrencia_atendimento to anon, authenticated;
+grant select on public.vw_atendimentos_dashboard_legado to anon, authenticated;
+
+alter table public.zonas enable row level security;
+alter table public.bairros enable row level security;
+alter table public.tipos_ocorrencia enable row level security;
+alter table public.subtipos_ocorrencia enable row level security;
+alter table public.campos_extras_ocorrencia enable row level security;
+alter table public.atendimentos_raps enable row level security;
+alter table public.classificacao_ocorrencia_atendimento enable row level security;
+
+drop policy if exists "zonas_select_public" on public.zonas;
+create policy "zonas_select_public"
+on public.zonas
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "bairros_select_public" on public.bairros;
+create policy "bairros_select_public"
+on public.bairros
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "tipos_ocorrencia_select_public" on public.tipos_ocorrencia;
+create policy "tipos_ocorrencia_select_public"
+on public.tipos_ocorrencia
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "subtipos_ocorrencia_select_public" on public.subtipos_ocorrencia;
+create policy "subtipos_ocorrencia_select_public"
+on public.subtipos_ocorrencia
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "campos_extras_ocorrencia_select_public" on public.campos_extras_ocorrencia;
+create policy "campos_extras_ocorrencia_select_public"
+on public.campos_extras_ocorrencia
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "atendimentos_raps_select_public" on public.atendimentos_raps;
+create policy "atendimentos_raps_select_public"
+on public.atendimentos_raps
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "atendimentos_raps_insert_public" on public.atendimentos_raps;
+create policy "atendimentos_raps_insert_public"
+on public.atendimentos_raps
+for insert
+to anon, authenticated
+with check (true);
+
+drop policy if exists "atendimentos_raps_delete_public" on public.atendimentos_raps;
+create policy "atendimentos_raps_delete_public"
+on public.atendimentos_raps
+for delete
+to anon, authenticated
+using (true);
+
+drop policy if exists "classificacao_ocorrencia_select_public" on public.classificacao_ocorrencia_atendimento;
+create policy "classificacao_ocorrencia_select_public"
+on public.classificacao_ocorrencia_atendimento
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "classificacao_ocorrencia_insert_public" on public.classificacao_ocorrencia_atendimento;
+create policy "classificacao_ocorrencia_insert_public"
+on public.classificacao_ocorrencia_atendimento
+for insert
+to anon, authenticated
+with check (true);
+
+drop policy if exists "classificacao_ocorrencia_update_public" on public.classificacao_ocorrencia_atendimento;
+create policy "classificacao_ocorrencia_update_public"
+on public.classificacao_ocorrencia_atendimento
+for update
+to anon, authenticated
+using (true)
+with check (true);
+
+-- =========================================================
+-- CHECKS RAPIDOS
+-- =========================================================
+
+-- select * from public.zonas;
+-- select * from public.bairros order by nome;
+-- select * from public.tipos_ocorrencia;
+-- select * from public.subtipos_ocorrencia order by ordem;
+-- select * from public.campos_extras_ocorrencia order by ordem;

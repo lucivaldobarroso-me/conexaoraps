@@ -6,11 +6,15 @@ export const USER_AVATAR_URL = "https://lh3.googleusercontent.com/aida-public/AB
 // Login Background Pattern (Data URI)
 export const LOGIN_BG_PATTERN = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMCwgODYsIDE3OSwgMC4wNSkiLz48L3N2Zz4=";
 
-// API Connection
-// API Connections
+// Legacy API Connections kept only as migration reference in this copy.
 export const AUTH_API_URL = "https://script.google.com/macros/s/AKfycbxWrKp35WbLNUPfU320EO4_2GBiEWzrtQDxe6k9gcPVTKPV4N4wO68iM2vb8SfqzwNe8A/exec";
 export const DATA_API_URL = "https://script.google.com/macros/s/AKfycbycsGMCh1_PHFZmYQ-rGAQ84QnJAYmnuxELk2pepazfnpOvj7L_8jxRI4ejRrNGaeJuFQ/exec";
 
+// New project environment configuration.
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
 // Constants for Dropdowns
-export const YES_NO_OPTIONS = ["Sim", "Não"];
+export const YES_NO_OPTIONS = ["Sim", "NÃ£o"];
 export const SEX_OPTIONS = ["Masculino", "Feminino"];

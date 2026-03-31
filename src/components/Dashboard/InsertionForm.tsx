@@ -2,14 +2,47 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 import Sidebar from './Sidebar';
 import { api } from '../../services/api';
+import { GOOGLE_MAPS_API_KEY } from '../../constants';
 
 const libraries: ("places" | "visualization")[] = ['places', 'visualization'];
+
+type ExtraDefinition = {
+    id: string;
+    subtipo_id: string;
+    chave: string;
+    rotulo: string;
+    tipo_dado: 'text' | 'number' | 'boolean' | 'select' | 'multiselect';
+    obrigatorio: boolean;
+    opcoes?: string[];
+    ajuda?: string;
+    ordem?: number;
+};
+
+type MotivoState = {
+    tipoId: string;
+    subtipoId: string;
+    extras: Record<string, any>;
+};
 
 const InsertionForm: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [bairrosZonas, setBairrosZonas] = useState<Record<string, string[]>>({});
     const [patientNames, setPatientNames] = useState<string[]>([]);
     const [msg, setMsg] = useState<{ type: 'success' | 'info' | 'error', text: string } | null>(null);
+    const [occurrenceCatalog, setOccurrenceCatalog] = useState<{
+        tipos: { id: string; nome: string }[];
+        subtipos: Record<string, { id: string; nome: string }[]>;
+        extras: Record<string, ExtraDefinition[]>;
+    }>({ tipos: [], subtipos: {}, extras: {} });
+    const [occurrence, setOccurrence] = useState<{
+        motivoInicial: MotivoState;
+        motivoConstatado: MotivoState;
+        detalheLivre: string;
+    }>({
+        motivoInicial: { tipoId: '', subtipoId: '', extras: {} },
+        motivoConstatado: { tipoId: '', subtipoId: '', extras: {} },
+        detalheLivre: ''
+    });
 
     // Alert State
     const [visitCount, setVisitCount] = useState<number>(0);
@@ -46,9 +79,22 @@ const InsertionForm: React.FC = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const data = await api.carregarBairros();
+                const [data, occurrenceData] = await Promise.all([
+                    api.carregarBairros(),
+                    api.carregarClassificacaoPsiquiatrica()
+                ]);
                 setBairrosZonas(data.bairros);
                 setPatientNames(data.nomes);
+                setOccurrenceCatalog(occurrenceData);
+
+                const defaultTipoId = occurrenceData.tipos?.[0]?.id || '';
+                if (defaultTipoId) {
+                    setOccurrence(prev => ({
+                        ...prev,
+                        motivoInicial: { ...prev.motivoInicial, tipoId: prev.motivoInicial.tipoId || defaultTipoId },
+                        motivoConstatado: { ...prev.motivoConstatado, tipoId: prev.motivoConstatado.tipoId || defaultTipoId }
+                    }));
+                }
             } catch (e) {
                 console.error("Erro ao carregar dados iniciais", e);
             }
@@ -60,7 +106,7 @@ const InsertionForm: React.FC = () => {
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
-        googleMapsApiKey: "AIzaSyBWQmTwPhctTH66wTRaiPUsmGaf6rpyRqE",
+        googleMapsApiKey: GOOGLE_MAPS_API_KEY,
         libraries,
         language: 'pt-BR',
         region: 'br'
@@ -205,6 +251,138 @@ const InsertionForm: React.FC = () => {
         });
     };
 
+    const getSubtipos = (tipoId: string) => occurrenceCatalog.subtipos[tipoId] || [];
+    const getExtras = (subtipoId: string) => occurrenceCatalog.extras[subtipoId] || [];
+
+    const handleOccurrenceFieldChange = (bloco: 'motivoInicial' | 'motivoConstatado', campo: 'tipoId' | 'subtipoId', valor: string) => {
+        setOccurrence(prev => {
+            const current = prev[bloco];
+            const next = { ...current, [campo]: valor };
+
+            if (campo === 'tipoId') {
+                next.subtipoId = '';
+                next.extras = {};
+            }
+
+            if (campo === 'subtipoId') {
+                next.extras = {};
+            }
+
+            return { ...prev, [bloco]: next };
+        });
+    };
+
+    const handleOccurrenceExtraChange = (
+        bloco: 'motivoInicial' | 'motivoConstatado',
+        chave: string,
+        valor: any,
+        tipoDado: ExtraDefinition['tipo_dado']
+    ) => {
+        setOccurrence(prev => {
+            const current = prev[bloco];
+            let finalValue: any = valor;
+
+            if (tipoDado === 'boolean') {
+                finalValue = valor === '' ? '' : valor;
+            }
+
+            if (tipoDado === 'multiselect') {
+                finalValue = Array.isArray(valor) ? valor : [];
+            }
+
+            return {
+                ...prev,
+                [bloco]: {
+                    ...current,
+                    extras: {
+                        ...current.extras,
+                        [chave]: finalValue
+                    }
+                }
+            };
+        });
+    };
+
+    const renderOccurrenceExtraField = (bloco: 'motivoInicial' | 'motivoConstatado', field: ExtraDefinition) => {
+        const value = occurrence[bloco].extras[field.chave] ?? (field.tipo_dado === 'multiselect' ? [] : '');
+        const commonLabel = `${field.rotulo}${field.obrigatorio ? ' *' : ''}`;
+
+        if (field.tipo_dado === 'select') {
+            return (
+                <div key={`${bloco}-${field.id}`}>
+                    <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">{commonLabel}</label>
+                    <select
+                        value={value}
+                        onChange={(e) => handleOccurrenceExtraChange(bloco, field.chave, e.target.value, field.tipo_dado)}
+                        className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium"
+                    >
+                        <option value="">Selecione</option>
+                        {(field.opcoes || []).map((opcao) => (
+                            <option key={opcao} value={opcao}>{opcao}</option>
+                        ))}
+                    </select>
+                    {field.ajuda && <p className="text-[11px] text-gray-500 mt-1">{field.ajuda}</p>}
+                </div>
+            );
+        }
+
+        if (field.tipo_dado === 'boolean') {
+            return (
+                <div key={`${bloco}-${field.id}`}>
+                    <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">{commonLabel}</label>
+                    <select
+                        value={value}
+                        onChange={(e) => handleOccurrenceExtraChange(bloco, field.chave, e.target.value, field.tipo_dado)}
+                        className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium"
+                    >
+                        <option value="">Selecione</option>
+                        <option value="SIM">SIM</option>
+                        <option value="NÃO">NÃO</option>
+                    </select>
+                </div>
+            );
+        }
+
+        if (field.tipo_dado === 'multiselect') {
+            const values = Array.isArray(value) ? value : [];
+            return (
+                <div key={`${bloco}-${field.id}`}>
+                    <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-2">{commonLabel}</label>
+                    <div className="space-y-2">
+                        {(field.opcoes || []).map((opcao) => (
+                            <label key={opcao} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                                <input
+                                    type="checkbox"
+                                    checked={values.includes(opcao)}
+                                    onChange={(e) => {
+                                        const nextValues = e.target.checked
+                                            ? [...values, opcao]
+                                            : values.filter((item: string) => item !== opcao);
+                                        handleOccurrenceExtraChange(bloco, field.chave, nextValues, field.tipo_dado);
+                                    }}
+                                />
+                                {opcao}
+                            </label>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div key={`${bloco}-${field.id}`}>
+                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">{commonLabel}</label>
+                <input
+                    type={field.tipo_dado === 'number' ? 'number' : 'text'}
+                    value={value}
+                    onChange={(e) => handleOccurrenceExtraChange(bloco, field.chave, field.tipo_dado === 'number' ? e.target.value : e.target.value.toUpperCase(), field.tipo_dado)}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium uppercase"
+                />
+                {field.ajuda && <p className="text-[11px] text-gray-500 mt-1">{field.ajuda}</p>}
+            </div>
+        );
+    };
+
     const [foundPatient, setFoundPatient] = useState<any>(null);
 
     const checkPatient = async (nome: string, nascimento: string) => {
@@ -224,7 +402,7 @@ const InsertionForm: React.FC = () => {
             } else {
                 setFoundPatient(null);
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
         }
     };
@@ -322,7 +500,22 @@ const InsertionForm: React.FC = () => {
                 info_extra: formData.info,
                 responsavel: userInfo.nomeCompleto || 'Desconhecido',
                 raca: finalRaca,
-                nacionalidade: finalNacionalidade
+                nacionalidade: finalNacionalidade,
+                classificacao_ocorrencia: {
+                    motivo_inicial: {
+                        tipo_id: occurrence.motivoInicial.tipoId || null,
+                        subtipo_id: occurrence.motivoInicial.subtipoId || null,
+                        extras: occurrence.motivoInicial.extras,
+                        campos_definicao: getExtras(occurrence.motivoInicial.subtipoId)
+                    },
+                    motivo_constatado: {
+                        tipo_id: occurrence.motivoConstatado.tipoId || null,
+                        subtipo_id: occurrence.motivoConstatado.subtipoId || null,
+                        extras: occurrence.motivoConstatado.extras,
+                        campos_definicao: getExtras(occurrence.motivoConstatado.subtipoId)
+                    },
+                    detalhe_livre: occurrence.detalheLivre
+                }
             };
 
             const data = await api.salvarSamu(payload);
@@ -330,14 +523,64 @@ const InsertionForm: React.FC = () => {
                 setMsg({ type: 'success', text: '✅ Registro salvo com sucesso!' });
                 setTimeout(() => window.location.reload(), 2000);
             } else {
-                setMsg({ type: 'error', text: 'Erro ao salvar.' });
+                setMsg({ type: 'error', text: data.message || 'Erro ao salvar.' });
             }
 
         } catch (e) {
-            setMsg({ type: 'error', text: 'Erro de conexão.' });
+            setMsg({ type: 'error', text: e?.message || 'Erro de conexão.' });
         } finally {
             setLoading(false);
         }
+    };
+
+    const renderOccurrenceBlock = (titulo: string, bloco: 'motivoInicial' | 'motivoConstatado') => {
+        const current = occurrence[bloco];
+        const tipoOptions = occurrenceCatalog.tipos;
+        const subtipoOptions = getSubtipos(current.tipoId);
+        const extraFields = getExtras(current.subtipoId);
+
+        return (
+            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/80 dark:bg-slate-800/40 dark:border-slate-700 space-y-4">
+                <h3 className="text-base font-bold text-brand-dark dark:text-white uppercase">{titulo}</h3>
+
+                <div>
+                    <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Tipo</label>
+                    <select
+                        value={current.tipoId}
+                        onChange={(e) => handleOccurrenceFieldChange(bloco, 'tipoId', e.target.value)}
+                        className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium"
+                    >
+                        <option value="">Selecione</option>
+                        {tipoOptions.map((tipo) => (
+                            <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Subtipo</label>
+                    <select
+                        value={current.subtipoId}
+                        onChange={(e) => handleOccurrenceFieldChange(bloco, 'subtipoId', e.target.value)}
+                        className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium"
+                    >
+                        <option value="">Selecione</option>
+                        {subtipoOptions.map((subtipo) => (
+                            <option key={subtipo.id} value={subtipo.id}>{subtipo.nome}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="space-y-3">
+                    <label className="block text-brand-dark dark:text-white font-semibold text-sm">Campos Extras</label>
+                    {extraFields.length > 0 ? (
+                        extraFields.map((field) => renderOccurrenceExtraField(bloco, field))
+                    ) : (
+                        <p className="text-sm text-gray-500">Nenhum campo extra para este subtipo.</p>
+                    )}
+                </div>
+            </div>
+        );
     };
 
     return (
@@ -559,6 +802,29 @@ const InsertionForm: React.FC = () => {
                         <div>
                             <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Ponto de Referência</label>
                             <input type="text" id="ref" value={formData.ref} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium uppercase" />
+                        </div>
+
+                        <div className="space-y-4 p-5 rounded-2xl border border-brand-medium/20 bg-brand-light/10">
+                            <div>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-white uppercase">Tipo de Ocorrência Constatada</h3>
+                                <p className="text-sm text-gray-500">Classificação psiquiátrica vinculada ao atendimento.</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {renderOccurrenceBlock('Motivo Inicial', 'motivoInicial')}
+                                {renderOccurrenceBlock('Motivo Constatado', 'motivoConstatado')}
+                            </div>
+
+                            <div>
+                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Detalhe Livre</label>
+                                <textarea
+                                    rows={4}
+                                    value={occurrence.detalheLivre}
+                                    onChange={(e) => setOccurrence(prev => ({ ...prev, detalheLivre: e.target.value.toUpperCase() }))}
+                                    placeholder="Descreva o contexto da situação psiquiátrica..."
+                                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium uppercase"
+                                />
+                            </div>
                         </div>
 
                         {/* Diagnostico & Reincidente */}
