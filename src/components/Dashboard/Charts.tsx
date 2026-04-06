@@ -15,10 +15,10 @@ export const GenderPieChart: React.FC<{ data: { name: string, value: number }[] 
         <Pie
           data={data}
           cx="50%"
-          cy="50%"
+          cy="44%"
           labelLine={false}
           label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-          outerRadius={80}
+          outerRadius={74}
           fill="#8884d8"
           dataKey="value"
         >
@@ -27,7 +27,7 @@ export const GenderPieChart: React.FC<{ data: { name: string, value: number }[] 
           ))}
         </Pie>
         <Tooltip />
-        <Legend verticalAlign="bottom" height={36} />
+        <Legend verticalAlign="bottom" height={56} wrapperStyle={{ paddingTop: 12 }} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -175,9 +175,9 @@ export const DiagnoseChart: React.FC<{ data: { name: string, value: number }[] }
         <Pie
           data={data}
           cx="50%"
-          cy="50%"
+          cy="44%"
           innerRadius={0}
-          outerRadius={80}
+          outerRadius={74}
           paddingAngle={5}
           dataKey="value"
         >
@@ -186,7 +186,7 @@ export const DiagnoseChart: React.FC<{ data: { name: string, value: number }[] }
           ))}
         </Pie>
         <Tooltip />
-        <Legend verticalAlign="bottom" height={36} />
+        <Legend verticalAlign="bottom" height={56} wrapperStyle={{ paddingTop: 12 }} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -200,10 +200,10 @@ export const RaceChart: React.FC<{ data: { name: string, value: number }[] }> = 
         <Pie
           data={data}
           cx="50%"
-          cy="50%"
+          cy="42%"
           labelLine={false}
           label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-          outerRadius={80}
+          outerRadius={72}
           fill="#8884d8"
           dataKey="value"
         >
@@ -212,7 +212,7 @@ export const RaceChart: React.FC<{ data: { name: string, value: number }[] }> = 
           ))}
         </Pie>
         <Tooltip />
-        <Legend verticalAlign="bottom" height={36} />
+        <Legend verticalAlign="bottom" height={64} wrapperStyle={{ paddingTop: 16 }} />
       </PieChart>
     </ResponsiveContainer>
   );

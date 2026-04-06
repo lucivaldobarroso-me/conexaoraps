@@ -1,39 +1,171 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 import Sidebar from './Sidebar';
 import { api } from '../../services/api';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
+import type {
+    LegacyPatientLookupData,
+    OccurrenceClassificationCatalog,
+    OccurrenceExtraValue,
+    OccurrenceExtraDefinition,
+    PatientLookupResult,
+    SamuAttendancePayload
+} from '../../types';
 
 const libraries: ("places" | "visualization")[] = ['places', 'visualization'];
 
-type ExtraDefinition = {
-    id: string;
-    subtipo_id: string;
-    chave: string;
-    rotulo: string;
-    tipo_dado: 'text' | 'number' | 'boolean' | 'select' | 'multiselect';
-    obrigatorio: boolean;
-    opcoes?: string[];
-    ajuda?: string;
-    ordem?: number;
+const normalizeUpper = (value: string) =>
+    value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+const extractStreetNumber = (...values: Array<string | undefined>) => {
+    for (const rawValue of values) {
+        const value = String(rawValue ?? '').trim();
+        if (!value) continue;
+
+        const match = value.match(/(?:^|,\s*|\s+)(\d{1,6}[A-Z]?)\b/);
+        if (match?.[1]) return match[1].toUpperCase();
+    }
+
+    return '';
+};
+
+const extrairBairroGoogle = (componentes: google.maps.GeocoderAddressComponent[] = []) => {
+    for (const componente of componentes) {
+        const tipos = componente.types;
+        if (tipos.includes('sublocality') || tipos.includes('sublocality_level_1') || tipos.includes('neighborhood')) {
+            return componente.long_name.toUpperCase();
+        }
+    }
+
+    return '';
+};
+
+const normalizarBairroParaComparacao = (bairro: string) =>
+    normalizeUpper(bairro)
+        .replace(/^BAIRRO\s+/, '')
+        .replace(/^CONJUNTO\s+/, '')
+        .replace(/^CJ\s+/, '')
+        .replace(/^JARDIM\s+/, 'JARDIM ')
+        .replace(/^TREZE DE SETEMBRO$/, '13 DE SETEMBRO');
+
+const extrairBairroDosResultadosGoogle = (resultados: google.maps.GeocoderResult[] = []) => {
+    for (const resultado of resultados) {
+        const bairro = extrairBairroGoogle(resultado.address_components || []);
+        if (bairro) return bairro;
+    }
+
+    return '';
+};
+
+const inferirBairroPorEnderecoENumero = (endereco: string, numero: string) => {
+    const enderecoNormalizado = normalizeUpper(endereco);
+    const numeroLimpo = Number(String(numero || '').replace(/\D/g, ''));
+
+    if (enderecoNormalizado === 'AVENIDA VILLE ROY' && !Number.isNaN(numeroLimpo)) {
+        if (numeroLimpo >= 5373 && numeroLimpo <= 7098) {
+            return 'CENTRO';
+        }
+    }
+
+    return '';
+};
+
+const selecionarMelhorResultadoGeocode = (resultados: google.maps.GeocoderResult[] = []) => {
+    const prioridade = ['ROOFTOP', 'RANGE_INTERPOLATED', 'GEOMETRIC_CENTER', 'APPROXIMATE'];
+
+    return [...resultados].sort((a, b) => {
+        const prioridadeA = prioridade.indexOf(String(a.geometry?.location_type || ''));
+        const prioridadeB = prioridade.indexOf(String(b.geometry?.location_type || ''));
+        return (prioridadeA === -1 ? 999 : prioridadeA) - (prioridadeB === -1 ? 999 : prioridadeB);
+    })[0];
+};
+
+const normalizarExtrasOcorrencia = (
+    extras: Record<string, OccurrenceExtraValue> | undefined,
+    campos: OccurrenceExtraDefinition[]
+) => {
+    const origem = extras ?? {};
+    const normalizado: Record<string, OccurrenceExtraValue> = {};
+
+    campos.forEach((campo) => {
+        const valor = origem[campo.chave];
+        if (campo.tipo_dado === 'multiselect') {
+            normalizado[campo.chave] = Array.isArray(valor) ? valor : [];
+            return;
+        }
+
+        normalizado[campo.chave] = valor ?? '';
+    });
+
+    return normalizado;
+};
+
+const calcularIdade = (nascimento: string) => {
+    if (!nascimento) return '';
+
+    const hoje = new Date();
+    const nasc = new Date(nascimento);
+    if (Number.isNaN(nasc.getTime())) return '';
+
+    let idade = hoje.getFullYear() - nasc.getFullYear();
+    const m = hoje.getMonth() - nasc.getMonth();
+    if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+
+    return idade.toString();
+};
+
+const extrairDadosRaca = (valorRaca: string | undefined) => {
+    const valor = String(valorRaca ?? '').trim();
+    const valorNormalizado = normalizeUpper(valor);
+
+    if (!valor) {
+        return { raca: '', etnia: '', outraRaca: '' };
+    }
+
+    if (valorNormalizado.startsWith('INDIGENA')) {
+        const etnia = valor.split('-')[1]?.trim() || '';
+        return { raca: 'INDIGENA', etnia: etnia.toUpperCase(), outraRaca: '' };
+    }
+
+    if (['BRANCA', 'PRETA', 'PARDA', 'AMARELA'].includes(valorNormalizado)) {
+        return { raca: valorNormalizado, etnia: '', outraRaca: '' };
+    }
+
+    return { raca: 'OUTROS', etnia: '', outraRaca: valor.toUpperCase() };
+};
+
+const extrairDadosNacionalidade = (valorNacionalidade: string | undefined) => {
+    const valor = String(valorNacionalidade ?? '').trim();
+    const valorNormalizado = normalizeUpper(valor);
+
+    if (!valor) {
+        return { nacionalidade: '', outraNacionalidade: '' };
+    }
+
+    if (['BRASILEIRO', 'VENEZUELANO', 'GUIANENSE', 'HAITIANO'].includes(valorNormalizado)) {
+        return { nacionalidade: valorNormalizado, outraNacionalidade: '' };
+    }
+
+    return { nacionalidade: 'OUTROS', outraNacionalidade: valor.toUpperCase() };
 };
 
 type MotivoState = {
     tipoId: string;
     subtipoId: string;
-    extras: Record<string, any>;
+    extras: Record<string, string | number | boolean | string[] | null | undefined>;
 };
 
 const InsertionForm: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [bairrosZonas, setBairrosZonas] = useState<Record<string, string[]>>({});
     const [patientNames, setPatientNames] = useState<string[]>([]);
+    const [mostrarSugestoesNome, setMostrarSugestoesNome] = useState(false);
     const [msg, setMsg] = useState<{ type: 'success' | 'info' | 'error', text: string } | null>(null);
-    const [occurrenceCatalog, setOccurrenceCatalog] = useState<{
-        tipos: { id: string; nome: string }[];
-        subtipos: Record<string, { id: string; nome: string }[]>;
-        extras: Record<string, ExtraDefinition[]>;
-    }>({ tipos: [], subtipos: {}, extras: {} });
+    const [occurrenceCatalog, setOccurrenceCatalog] = useState<OccurrenceClassificationCatalog>({
+        tipos: [],
+        subtipos: {},
+        extras: {}
+    });
     const [occurrence, setOccurrence] = useState<{
         motivoInicial: MotivoState;
         motivoConstatado: MotivoState;
@@ -87,14 +219,6 @@ const InsertionForm: React.FC = () => {
                 setPatientNames(data.nomes);
                 setOccurrenceCatalog(occurrenceData);
 
-                const defaultTipoId = occurrenceData.tipos?.[0]?.id || '';
-                if (defaultTipoId) {
-                    setOccurrence(prev => ({
-                        ...prev,
-                        motivoInicial: { ...prev.motivoInicial, tipoId: prev.motivoInicial.tipoId || defaultTipoId },
-                        motivoConstatado: { ...prev.motivoConstatado, tipoId: prev.motivoConstatado.tipoId || defaultTipoId }
-                    }));
-                }
             } catch (e) {
                 console.error("Erro ao carregar dados iniciais", e);
             }
@@ -103,6 +227,7 @@ const InsertionForm: React.FC = () => {
     }, []);
 
     const addressInputRef = useRef<HTMLInputElement>(null);
+    const nomeInputRef = useRef<HTMLInputElement>(null);
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
@@ -112,10 +237,40 @@ const InsertionForm: React.FC = () => {
         region: 'br'
     });
 
+    const encontrarBairroEZona = (bairroGoogle: string) => {
+        if (!bairroGoogle) return { bairro: '', zona: '' };
+
+        const normalizedNewBairro = normalizarBairroParaComparacao(bairroGoogle);
+
+        for (const [zona, bairrosList] of Object.entries(bairrosZonas)) {
+            const bairros = bairrosList as string[];
+            const match = bairros.find((bairro) =>
+                bairro === bairroGoogle ||
+                normalizarBairroParaComparacao(bairro) === normalizedNewBairro ||
+                normalizedNewBairro.includes(normalizarBairroParaComparacao(bairro)) ||
+                normalizarBairroParaComparacao(bairro).includes(normalizedNewBairro)
+            );
+
+            if (match) {
+                return { bairro: match, zona };
+            }
+        }
+
+        return { bairro: '', zona: '' };
+    };
+
+    const listaBairros = Object.values(bairrosZonas)
+        .flat()
+        .filter(Boolean)
+        .map((bairro) => String(bairro))
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
     // Initialize Google Maps Autocomplete
     useEffect(() => {
-        if (isLoaded && addressInputRef.current && (window as any).google) {
-            const google = (window as any).google;
+        const googleMaps = window.google;
+
+        if (isLoaded && addressInputRef.current && googleMaps) {
+            const google = googleMaps;
 
             // Bounds for Boa Vista, Roraima
             const boaVistaBounds = {
@@ -128,87 +283,152 @@ const InsertionForm: React.FC = () => {
             const options = {
                 bounds: boaVistaBounds,
                 componentRestrictions: { country: "br" },
-                fields: ["address_components", "geometry", "name"],
+                fields: ["address_components", "geometry", "name", "formatted_address"],
                 strictBounds: false
             };
 
             try {
+                const geocoder = new google.maps.Geocoder();
                 const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, options);
 
-                autocomplete.addListener('place_changed', () => {
+                autocomplete.addListener('place_changed', async () => {
                     const place = autocomplete.getPlace();
-                    if (!place.address_components) return;
-
                     let newAddr = '';
                     let newNum = '';
                     let newBairro = '';
-                    let newCity = '';
+                    const rawInput = addressInputRef.current?.value || '';
 
-                    place.address_components.forEach((c: any) => {
+                    (place.address_components || []).forEach((c: google.maps.GeocoderAddressComponent) => {
                         const type = c.types;
                         if (type.includes("route")) newAddr = c.long_name.toUpperCase();
                         if (type.includes("street_number")) newNum = c.long_name.toUpperCase();
-                        // Try multiple types for 'Bairro'
-                        if (type.includes("sublocality") || type.includes("sublocality_level_1") || type.includes("neighborhood")) {
-                            newBairro = c.long_name.toUpperCase();
-                        }
-                        if (type.includes("administrative_area_level_2")) {
-                            newCity = c.long_name.toUpperCase();
-                        }
                     });
+                    newBairro = extrairBairroGoogle(place.address_components || []);
 
                     // Fallback to name if route is missing but name exists (e.g. business name as address)
                     if (!newAddr && place.name) {
                         newAddr = place.name.toUpperCase();
                     }
 
-                    const latLng = place.geometry?.location ? `${place.geometry.location.lat()}, ${place.geometry.location.lng()}` : '';
+                    if (!newNum) {
+                        newNum = extractStreetNumber(rawInput, place.formatted_address, place.name);
+                    }
+
+                    let latitude = place.geometry?.location?.lat();
+                    let longitude = place.geometry?.location?.lng();
+
+                    if (newAddr && newNum) {
+                        try {
+                            const resultadoGeocode = await geocoder.geocode({
+                                address: `${newAddr}, ${newNum}, BOA VISTA, RR, BRASIL`,
+                                componentRestrictions: { country: 'BR' }
+                            });
+
+                            const primeiroResultado = selecionarMelhorResultadoGeocode(resultadoGeocode.results || []);
+                            if (primeiroResultado?.geometry?.location) {
+                                latitude = primeiroResultado.geometry.location.lat();
+                                longitude = primeiroResultado.geometry.location.lng();
+                            }
+
+                            if (!newBairro) {
+                                newBairro = extrairBairroDosResultadosGoogle(resultadoGeocode.results || []);
+                            }
+                        } catch (erroGeocode) {
+                            console.warn('Geocode do endereço não retornou resultado mais preciso.', erroGeocode);
+                        }
+                    }
+
+                    if ((!newBairro || latitude === undefined || longitude === undefined) && place.formatted_address) {
+                        try {
+                            const resultadoGeocodeFormatado = await geocoder.geocode({
+                                address: place.formatted_address,
+                                componentRestrictions: { country: 'BR' }
+                            });
+
+                            const primeiroResultado = selecionarMelhorResultadoGeocode(resultadoGeocodeFormatado.results || []);
+                            if ((latitude === undefined || longitude === undefined) && primeiroResultado?.geometry?.location) {
+                                latitude = primeiroResultado.geometry.location.lat();
+                                longitude = primeiroResultado.geometry.location.lng();
+                            }
+
+                            if (!newBairro) {
+                                newBairro = extrairBairroDosResultadosGoogle(resultadoGeocodeFormatado.results || []);
+                            }
+                        } catch (erroGeocodeFormatado) {
+                            console.warn('Geocode do endereço formatado não retornou bairro complementar.', erroGeocodeFormatado);
+                        }
+                    }
+
+                    if ((!newBairro || !newAddr) && latitude !== undefined && longitude !== undefined) {
+                        try {
+                            const resultadoReverse = await geocoder.geocode({
+                                location: { lat: latitude, lng: longitude }
+                            });
+
+                            const primeiroResultado = selecionarMelhorResultadoGeocode(resultadoReverse.results || []);
+                            if (!newBairro) {
+                                newBairro = extrairBairroDosResultadosGoogle(resultadoReverse.results || []);
+                            }
+                            if (!newAddr) {
+                                const rota = (primeiroResultado?.address_components || []).find((c) => c.types.includes('route'));
+                                if (rota?.long_name) newAddr = rota.long_name.toUpperCase();
+                            }
+                        } catch (erroReverse) {
+                            console.warn('Reverse geocode não retornou bairro complementar.', erroReverse);
+                        }
+                    }
+
+                    let bairroEncontrado = encontrarBairroEZona(newBairro);
+
+                    if (!bairroEncontrado.bairro) {
+                        const bairroInferido = inferirBairroPorEnderecoENumero(newAddr, newNum);
+                        if (bairroInferido) {
+                            newBairro = bairroInferido;
+                            bairroEncontrado = encontrarBairroEZona(newBairro);
+                        }
+                    }
+
+                    if (newAddr && newNum && newBairro) {
+                        try {
+                            const resultadoGeocodeComBairro = await geocoder.geocode({
+                                address: `${newAddr}, ${newNum}, ${newBairro}, BOA VISTA, RR, BRASIL`,
+                                componentRestrictions: { country: 'BR' }
+                            });
+
+                            const primeiroResultado = selecionarMelhorResultadoGeocode(resultadoGeocodeComBairro.results || []);
+                            if (primeiroResultado?.geometry?.location) {
+                                latitude = primeiroResultado.geometry.location.lat();
+                                longitude = primeiroResultado.geometry.location.lng();
+                            }
+                        } catch (erroGeocodeBairro) {
+                            console.warn('Geocode com bairro inferido não retornou resultado melhor.', erroGeocodeBairro);
+                        }
+                    }
+
+                    const latLng = latitude !== undefined && longitude !== undefined ? `${latitude}, ${longitude}` : '';
 
                     setFormData(prev => {
                         const updated = {
                             ...prev,
                             endereco: newAddr,
                             numero: newNum,
-                            loc: latLng
+                            loc: latLng,
+                            bairro: newBairro || prev.bairro
                         };
 
-                        // Logic to auto-select Bairro if it matches our list
-                        if (newBairro) {
-                            // First, try direct match
-                            let finalBairro = '';
-                            let foundZone = '';
-
-                            // Normalize function for comparison
-                            const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-
-                            for (const [zona, bairrosList] of Object.entries(bairrosZonas)) {
-                                const bairros = bairrosList as string[];
-                                const normalizedNewBairro = normalize(newBairro);
-
-                                // Findings: Direct match, Includes, or Normalized match
-                                const match = bairros.find(b =>
-                                    b === newBairro ||
-                                    normalize(b) === normalizedNewBairro ||
-                                    newBairro.includes(b) || // Google: "Bairro Treze de Setembro" -> System: "13 DE SETEMBRO"? (Hard)
-                                    b.includes(newBairro)
-                                );
-
-                                if (match) {
-                                    finalBairro = match;
-                                    foundZone = zona;
-                                    break;
-                                }
-                            }
-
-                            if (finalBairro) {
-                                updated.bairro = finalBairro;
-                                updated.zona = foundZone;
-                            }
+                        if (bairroEncontrado.bairro) {
+                            updated.bairro = bairroEncontrado.bairro;
+                            updated.zona = bairroEncontrado.zona;
+                        } else if (!newBairro) {
+                            updated.bairro = '';
+                            updated.zona = '';
+                        } else {
+                            updated.zona = '';
                         }
                         return updated;
                     });
                 });
-                addressInputRef.current?.setAttribute('autocomplete', 'off');
+                addressInputRef.current.setAttribute('autocomplete', 'off');
             } catch (e) {
                 console.error("Erro ao inicializar Google Maps:", e);
             }
@@ -223,14 +443,49 @@ const InsertionForm: React.FC = () => {
         setFormData(prev => {
             const newData = { ...prev, [id]: val };
 
+            if (id === 'nome' && !String(val).trim()) {
+                setVisitCount(0);
+                setFoundPatient(null);
+                setMostrarSugestoesNome(true);
+                setMsg(null);
+                setOccurrence({
+                    motivoInicial: { tipoId: '', subtipoId: '', extras: {} },
+                    motivoConstatado: { tipoId: '', subtipoId: '', extras: {} },
+                    detalheLivre: ''
+                });
+
+                return {
+                    ...prev,
+                    id: '',
+                    nome: '',
+                    nascimento: '',
+                    idade: '',
+                    sexo: '',
+                    raca: '',
+                    etnia: '',
+                    outraRaca: '',
+                    nacionalidade: 'BRASILEIRO',
+                    outraNacionalidade: '',
+                    endereco: '',
+                    numero: '',
+                    bairro: '',
+                    zona: '',
+                    loc: '',
+                    ref: '',
+                    diag: '',
+                    reinc: '',
+                    med: 'Sim',
+                    pq_med: '',
+                    fam: 'Sim',
+                    pq_fam: '',
+                    raps: 'Não',
+                    info: ''
+                };
+            }
+
             // Auto-calculate age
             if (id === 'nascimento' && val) {
-                const hoje = new Date();
-                const nasc = new Date(val);
-                let idade = hoje.getFullYear() - nasc.getFullYear();
-                const m = hoje.getMonth() - nasc.getMonth();
-                if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) { idade--; }
-                newData.idade = idade.toString();
+                newData.idade = calcularIdade(val);
 
                 // Trigger search when birth date is selected
                 checkPatient(newData.nome, val);
@@ -238,12 +493,11 @@ const InsertionForm: React.FC = () => {
 
             // Auto-zone
             if (id === 'bairro') {
-                for (const [zona, bairrosList] of Object.entries(bairrosZonas)) {
-                    const bairros = bairrosList as string[];
-                    if (bairros.includes(val)) {
-                        newData.zona = zona;
-                        break;
-                    }
+                const bairroEncontrado = encontrarBairroEZona(String(val));
+                if (bairroEncontrado.zona) {
+                    newData.zona = bairroEncontrado.zona;
+                } else {
+                    newData.zona = '';
                 }
             }
 
@@ -253,6 +507,20 @@ const InsertionForm: React.FC = () => {
 
     const getSubtipos = (tipoId: string) => occurrenceCatalog.subtipos[tipoId] || [];
     const getExtras = (subtipoId: string) => occurrenceCatalog.extras[subtipoId] || [];
+
+    const encontrarSubtipoPorNome = (nomeSubtipo: string) => {
+        const nomeNormalizado = normalizeUpper(nomeSubtipo);
+
+        for (const [tipoId, subtipos] of Object.entries(occurrenceCatalog.subtipos)) {
+            const listaSubtipos = subtipos as { id: string; nome: string }[];
+            const subtipo = listaSubtipos.find((item) => normalizeUpper(item.nome) === nomeNormalizado);
+            if (subtipo) {
+                return { tipoId, subtipo };
+            }
+        }
+
+        return null;
+    };
 
     const handleOccurrenceFieldChange = (bloco: 'motivoInicial' | 'motivoConstatado', campo: 'tipoId' | 'subtipoId', valor: string) => {
         setOccurrence(prev => {
@@ -275,12 +543,12 @@ const InsertionForm: React.FC = () => {
     const handleOccurrenceExtraChange = (
         bloco: 'motivoInicial' | 'motivoConstatado',
         chave: string,
-        valor: any,
-        tipoDado: ExtraDefinition['tipo_dado']
+        valor: OccurrenceExtraValue,
+        tipoDado: OccurrenceExtraDefinition['tipo_dado']
     ) => {
         setOccurrence(prev => {
             const current = prev[bloco];
-            let finalValue: any = valor;
+            let finalValue: OccurrenceExtraValue = valor;
 
             if (tipoDado === 'boolean') {
                 finalValue = valor === '' ? '' : valor;
@@ -303,7 +571,7 @@ const InsertionForm: React.FC = () => {
         });
     };
 
-    const renderOccurrenceExtraField = (bloco: 'motivoInicial' | 'motivoConstatado', field: ExtraDefinition) => {
+    const renderOccurrenceExtraField = (bloco: 'motivoInicial' | 'motivoConstatado', field: OccurrenceExtraDefinition) => {
         const value = occurrence[bloco].extras[field.chave] ?? (field.tipo_dado === 'multiselect' ? [] : '');
         const commonLabel = `${field.rotulo}${field.obrigatorio ? ' *' : ''}`;
 
@@ -383,14 +651,32 @@ const InsertionForm: React.FC = () => {
         );
     };
 
-    const [foundPatient, setFoundPatient] = useState<any>(null);
+    const [foundPatient, setFoundPatient] = useState<LegacyPatientLookupData | null>(null);
+
+    const preencherCamposBasicosPaciente = (paciente: LegacyPatientLookupData) => {
+        const dadosRaca = extrairDadosRaca(paciente.raca);
+        const dadosNacionalidade = extrairDadosNacionalidade(paciente.nacionalidade);
+        setFormData((prev) => ({
+            ...prev,
+            id: paciente.id || prev.id,
+            nome: prev.nome,
+            nascimento: paciente.nascimento || prev.nascimento,
+            idade: paciente.nascimento ? calcularIdade(paciente.nascimento) : prev.idade,
+            sexo: paciente.sexo || prev.sexo,
+            raca: dadosRaca.raca || prev.raca,
+            etnia: dadosRaca.etnia || '',
+            outraRaca: dadosRaca.outraRaca || '',
+            nacionalidade: dadosNacionalidade.nacionalidade || prev.nacionalidade,
+            outraNacionalidade: dadosNacionalidade.outraNacionalidade || ''
+        }));
+    };
 
     const checkPatient = async (nome: string, nascimento: string) => {
-        if (!nome || !nascimento) return;
+        if (!nome) return;
         try {
-            const data = await api.verificarPaciente(nome);
+            const data: PatientLookupResult = await api.verificarPaciente(nome);
             // Handle count even if 'exists' is not the primary return or works differently
-            if (data.contagem) {
+            if (data.result === 'exists' && data.contagem) {
                 setVisitCount(data.contagem);
             } else {
                 setVisitCount(0);
@@ -398,11 +684,12 @@ const InsertionForm: React.FC = () => {
 
             if (data.result === 'exists') {
                 setFoundPatient(data.p);
+                preencherCamposBasicosPaciente(data.p);
                 setMsg({ type: 'info', text: '📋 Histórico encontrado! Deseja carregar os dados?' });
             } else {
                 setFoundPatient(null);
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
         }
     };
@@ -410,19 +697,35 @@ const InsertionForm: React.FC = () => {
     const loadPatientHistory = () => {
         if (!foundPatient) return;
         const p = foundPatient;
+        const dadosRaca = extrairDadosRaca(p.raca);
+        const dadosNacionalidade = extrairDadosNacionalidade(p.nacionalidade);
+        const classificacao = p.classificacao;
         setFormData(prev => {
             const updated = {
                 ...prev,
+                nome: prev.nome,
+                id: p.id || prev.id,
+                nascimento: p.nascimento || prev.nascimento,
+                idade: p.nascimento ? calcularIdade(p.nascimento) : prev.idade,
                 sexo: p.sexo || prev.sexo,
-                raca: p.raca || prev.raca, // Map if exists in history
-                nacionalidade: p.nacionalidade || prev.nacionalidade, // Map if exists
+                raca: dadosRaca.raca || prev.raca,
+                etnia: dadosRaca.etnia || '',
+                outraRaca: dadosRaca.outraRaca || '',
+                nacionalidade: dadosNacionalidade.nacionalidade || prev.nacionalidade,
+                outraNacionalidade: dadosNacionalidade.outraNacionalidade || '',
                 endereco: p.endereco || prev.endereco,
                 numero: p.num || prev.numero,
                 bairro: p.bairro || prev.bairro,
-                localizacao: p.loc || prev.loc,
-                referencia: p.ref || prev.referencia,
-                diagnosticado: p.diag || prev.diagnosticado,
-                reincidente: 'SIM'
+                loc: p.loc || prev.loc,
+                ref: p.ref || prev.ref,
+                diag: p.diag || prev.diag,
+                reinc: p.reinc || 'SIM',
+                med: p.med || prev.med,
+                pq_med: p.pq_med || prev.pq_med,
+                fam: p.fam || prev.fam,
+                pq_fam: p.pq_fam || prev.pq_fam,
+                raps: p.raps || prev.raps,
+                info: p.info || prev.info
             };
 
             // Recalc zone
@@ -437,13 +740,65 @@ const InsertionForm: React.FC = () => {
             }
             return updated;
         });
+
+        if (classificacao) {
+            setOccurrence((prev) => {
+                const motivoInicialEncontrado = encontrarSubtipoPorNome(classificacao.motivoInicialSubtipo);
+                const motivoConstatadoEncontrado = encontrarSubtipoPorNome(classificacao.motivoConstatadoSubtipo);
+
+                const motivoInicialCampos = motivoInicialEncontrado
+                    ? getExtras(motivoInicialEncontrado.subtipo.id)
+                    : [];
+                const motivoConstatadoCampos = motivoConstatadoEncontrado
+                    ? getExtras(motivoConstatadoEncontrado.subtipo.id)
+                    : [];
+
+                return {
+                    ...prev,
+                    motivoInicial: {
+                        tipoId: motivoInicialEncontrado?.tipoId || '',
+                        subtipoId: motivoInicialEncontrado?.subtipo.id || '',
+                        extras: normalizarExtrasOcorrencia(classificacao.motivoInicialExtras, motivoInicialCampos)
+                    },
+                    motivoConstatado: {
+                        tipoId: motivoConstatadoEncontrado?.tipoId || '',
+                        subtipoId: motivoConstatadoEncontrado?.subtipo.id || '',
+                        extras: normalizarExtrasOcorrencia(classificacao.motivoConstatadoExtras, motivoConstatadoCampos)
+                    },
+                    detalheLivre: classificacao.detalheLivre || ''
+                };
+            });
+        }
+
         setMsg({ type: 'success', text: '✅ Dados carregados com sucesso!' });
         setTimeout(() => setMsg(null), 3000);
         setFoundPatient(null);
     };
 
     const handleBlurName = () => {
-        checkPatient(formData.nome, formData.nascimento);
+        setTimeout(() => {
+            setMostrarSugestoesNome(false);
+            checkPatient(formData.nome, formData.nascimento);
+        }, 120);
+    };
+
+    const sugestoesNome = patientNames
+        .filter((nome) => {
+            const termo = formData.nome.trim();
+            if (!termo) return true;
+
+            const nomeNormalizado = normalizeUpper(nome);
+            const termoNormalizado = normalizeUpper(termo);
+
+            return nomeNormalizado.includes(termoNormalizado);
+        })
+        .slice(0, 8);
+
+    const handleSelectPatientName = (nome: string) => {
+        setFormData((prev) => ({ ...prev, nome }));
+        setMostrarSugestoesNome(false);
+        checkPatient(nome, formData.nascimento);
+        nomeInputRef.current?.focus();
     };
 
     const handleGetGPS = () => {
@@ -478,7 +833,7 @@ const InsertionForm: React.FC = () => {
                 finalNacionalidade = formData.outraNacionalidade;
             }
 
-            const payload = {
+            const payload: SamuAttendancePayload = {
                 id_paciente: formData.id,
                 nome: formData.nome,
                 nascimento: formData.nascimento,
@@ -527,7 +882,7 @@ const InsertionForm: React.FC = () => {
             }
 
         } catch (e) {
-            setMsg({ type: 'error', text: e?.message || 'Erro de conexão.' });
+            setMsg({ type: 'error', text: e.message || 'Erro de conexão.' });
         } finally {
             setLoading(false);
         }
@@ -620,40 +975,85 @@ const InsertionForm: React.FC = () => {
 
                     <div className="space-y-4">
                         {/* Nome */}
-                        <div>
-                            <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1 flex justify-between items-center">
-                                Nome do Paciente
-                                {foundPatient && (
-                                    <button
-                                        type="button"
-                                        onClick={loadPatientHistory}
-                                        className="text-brand-medium hover:text-brand-dark flex items-center gap-1 text-[11px] animate-pulse bg-brand-light/20 px-2 py-0.5 rounded-full"
-                                    >
-                                        <span className="material-symbols-outlined text-[14px]">history</span>
-                                        CARREGAR ÚLTIMOS DADOS?
-                                    </button>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+                            <div className="relative">
+                                <div className="mb-1 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                    <label className="block text-brand-dark dark:text-white font-semibold text-sm">
+                                        Nome do Paciente
+                                    </label>
+                                    {foundPatient && (
+                                        <button
+                                            type="button"
+                                            onClick={loadPatientHistory}
+                                            className="inline-flex items-center justify-center gap-2 rounded-full border border-brand-medium/30 bg-brand-light/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-brand-medium shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-light/35 hover:text-brand-dark"
+                                        >
+                                            <span className="material-symbols-outlined text-[14px]">history</span>
+                                            Clique para carregar os últimos dados
+                                        </button>
+                                    )}
+                                </div>
+                                <input
+                                    ref={nomeInputRef}
+                                    type="text"
+                                    id="nome"
+                                    value={formData.nome}
+                                    onChange={handleChange}
+                                    onFocus={() => setMostrarSugestoesNome(true)}
+                                    onBlur={handleBlurName}
+                                    placeholder="NOME COMPLETO"
+                                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium focus:border-transparent uppercase"
+                                />
+                                {mostrarSugestoesNome && sugestoesNome.length > 0 && (
+                                    <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_45px_-24px_rgba(15,23,42,0.35)]">
+                                        <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                                            Pacientes já cadastrados
+                                        </div>
+                                        <div className="max-h-64 overflow-y-auto py-1">
+                                            {sugestoesNome.map((nome) => (
+                                                <button
+                                                    key={nome}
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={() => handleSelectPatientName(nome)}
+                                                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-brand-light/15 hover:text-brand-dark"
+                                                >
+                                                    <span className="truncate font-medium">{nome}</span>
+                                                    <span className="ml-3 text-[10px] uppercase tracking-wide text-slate-400">Selecionar</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 )}
-                            </label>
-                            <input
-                                type="text"
-                                id="nome"
-                                list="lista-nomes"
-                                value={formData.nome}
-                                onChange={handleChange}
-                                onBlur={handleBlurName}
-                                placeholder="NOME COMPLETO"
-                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium focus:border-transparent uppercase"
-                            />
-                            <datalist id="lista-nomes">
-                                {patientNames.map((n, i) => <option key={i} value={n} />)}
-                            </datalist>
+                            </div>
+
+                            <div>
+                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Qtd. de Atendimentos</label>
+                                <input
+                                    type="text"
+                                    value={visitCount ? String(visitCount) : ''}
+                                    readOnly
+                                    placeholder="Automático"
+                                    className="w-full p-2.5 bg-gray-100 border border-gray-300 rounded-lg text-gray-500"
+                                />
+                            </div>
                         </div>
 
                         {/* ID & Nascimento Row */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">ID (Auto)</label>
-                                <input type="text" id="id" value={formData.id} readOnly placeholder="Gerado automaticamente" className="w-full p-2.5 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed" />
+                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">ID do Paciente</label>
+                                <div className={`rounded-lg border px-3 py-2.5 ${formData.id ? 'border-emerald-300 bg-emerald-50' : 'border-gray-300 bg-gray-100'}`}>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className={`min-w-0 truncate font-mono text-sm font-semibold ${formData.id ? 'text-emerald-800' : 'text-gray-500'}`}>
+                                            {formData.id || 'Gerado automaticamente'}
+                                        </span>
+                                        {formData.id && (
+                                            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                                                Identificado
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Data de Nascimento</label>
@@ -700,7 +1100,7 @@ const InsertionForm: React.FC = () => {
                                     </select>
                                 )}
                                 {formData.raca === 'OUTROS' && (
-                                    <input type="text" id="outraRaca" value={formData.outraRaca} onChange={handleChange} placeholder="Qual?" className="w-full p-2.5 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium uppercase text-sm" />
+                                    <input type="text" id="outraRaca" value={formData.outraRaca} onChange={handleChange} placeholder="Qual" className="w-full p-2.5 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium uppercase text-sm" />
                                 )}
                             </div>
 
@@ -715,7 +1115,7 @@ const InsertionForm: React.FC = () => {
                                     <option value="OUTROS">Outros</option>
                                 </select>
                                 {formData.nacionalidade === 'OUTROS' && (
-                                    <input type="text" id="outraNacionalidade" value={formData.outraNacionalidade} onChange={handleChange} placeholder="Qual país?" className="w-full p-2.5 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium uppercase text-sm" />
+                                    <input type="text" id="outraNacionalidade" value={formData.outraNacionalidade} onChange={handleChange} placeholder="Qual país" className="w-full p-2.5 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium uppercase text-sm" />
                                 )}
                             </div>
                         </div>
@@ -744,17 +1144,18 @@ const InsertionForm: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Bairro</label>
-                                <select id="bairro" value={formData.bairro} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
-                                    <option value="">Selecione o Bairro</option>
-                                    {Object.entries(bairrosZonas).map(([zona, bairrosList]) => {
-                                        const bairros = bairrosList as string[];
-                                        return (
-                                            <optgroup key={zona} label={zona}>
-                                                {bairros.map(b => <option key={b} value={b}>{b}</option>)}
-                                            </optgroup>
-                                        );
-                                    })}
-                                </select>
+                                <input
+                                    type="text"
+                                    id="bairro"
+                                    list="lista-bairros"
+                                    value={formData.bairro}
+                                    onChange={handleChange}
+                                    placeholder="Bairro detectado ou digitado"
+                                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium uppercase"
+                                />
+                                <datalist id="lista-bairros">
+                                    {listaBairros.map((bairro) => <option key={bairro} value={bairro} />)}
+                                </datalist>
                             </div>
                             <div>
                                 <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Zona (Automática)</label>
@@ -830,7 +1231,7 @@ const InsertionForm: React.FC = () => {
                         {/* Diagnostico & Reincidente */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Já é Diagnosticado?</label>
+                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Já é Diagnosticado</label>
                                 <select id="diag" value={formData.diag} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
                                     <option value="">Selecione</option>
                                     <option>Não</option>
@@ -838,7 +1239,7 @@ const InsertionForm: React.FC = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Reincidente?</label>
+                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Reincidente</label>
                                 <select id="reinc" value={formData.reinc} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
                                     <option value="">Selecione</option>
                                     <option>Não</option>
@@ -850,7 +1251,7 @@ const InsertionForm: React.FC = () => {
                         {/* Medicação */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Utiliza Medicação?</label>
+                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Utiliza Medicação</label>
                                 <select id="med" value={formData.med} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
                                     <option>Sim</option>
                                     <option>Não</option>
@@ -858,7 +1259,7 @@ const InsertionForm: React.FC = () => {
                             </div>
                             {formData.med === 'Não' && (
                                 <div>
-                                    <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Se não, por quê?</label>
+                                    <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Se não, por quê</label>
                                     <input type="text" id="pq_med" list="sugestoes-negativa" value={formData.pq_med} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium uppercase" placeholder="Selecione ou escreva..." />
                                 </div>
                             )}
@@ -867,7 +1268,7 @@ const InsertionForm: React.FC = () => {
                         {/* Apoio Fam */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Tem Apoio Familiar?</label>
+                                <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Tem Apoio Familiar</label>
                                 <select id="fam" value={formData.fam} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
                                     <option>Sim</option>
                                     <option>Não</option>
@@ -875,7 +1276,7 @@ const InsertionForm: React.FC = () => {
                             </div>
                             {formData.fam === 'Não' && (
                                 <div>
-                                    <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Se não, por quê?</label>
+                                    <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Se não, por quê</label>
                                     <input type="text" id="pq_fam" list="sugestoes-negativa" value={formData.pq_fam} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium uppercase" placeholder="Selecione ou escreva..." />
                                 </div>
                             )}
@@ -889,7 +1290,7 @@ const InsertionForm: React.FC = () => {
 
                         {/* RAPS */}
                         <div>
-                            <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Tem Apoio da RAPS?</label>
+                            <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Tem Apoio da RAPS</label>
                             <select id="raps" value={formData.raps} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
                                 <option>Não</option>
                                 <option>Sim</option>
@@ -917,3 +1318,4 @@ const InsertionForm: React.FC = () => {
 };
 
 export default InsertionForm;
+
