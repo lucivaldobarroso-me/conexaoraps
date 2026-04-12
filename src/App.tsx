@@ -5,10 +5,16 @@ import Dashboard from './components/Dashboard/Dashboard';
 import InsertionForm from './components/Dashboard/InsertionForm';
 import { api } from './services/api';
 import { supabase } from './services/supabase';
+import type { User } from './types';
+import { rotaInicialPorModulo, temPermissao, type AcaoAcesso } from './utils/permissoesAcesso';
 
-const ProtectedRoute: React.FC<{ authenticated: boolean; children: React.ReactNode }> = ({ authenticated, children }) => {
-  if (!authenticated) {
+const ProtectedRoute: React.FC<{ user: User | null; required: AcaoAcesso; children: React.ReactNode }> = ({ user, required, children }) => {
+  if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  if (!temPermissao(user, required)) {
+    return <Navigate to={rotaInicialPorModulo(user)} replace />;
   }
 
   return <>{children}</>;
@@ -17,6 +23,7 @@ const ProtectedRoute: React.FC<{ authenticated: boolean; children: React.ReactNo
 const App: React.FC = () => {
   const [authReady, setAuthReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -26,6 +33,7 @@ const App: React.FC = () => {
         const user = await api.restaurarSessaoUsuario();
         if (!isMounted) return;
         setAuthenticated(!!user);
+        setCurrentUser(user);
       } finally {
         if (isMounted) setAuthReady(true);
       }
@@ -39,9 +47,13 @@ const App: React.FC = () => {
 
         if (session?.user) {
           const user = await api.restaurarSessaoUsuario();
-          if (isMounted) setAuthenticated(!!user);
+          if (isMounted) {
+            setAuthenticated(!!user);
+            setCurrentUser(user);
+          }
         } else if (isMounted) {
           setAuthenticated(false);
+          setCurrentUser(null);
         }
       })();
     });
@@ -63,9 +75,9 @@ const App: React.FC = () => {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/" element={authenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
-        <Route path="/dashboard" element={<ProtectedRoute authenticated={authenticated}><Dashboard /></ProtectedRoute>} />
-        <Route path="/insertion" element={<ProtectedRoute authenticated={authenticated}><InsertionForm /></ProtectedRoute>} />
+        <Route path="/" element={authenticated ? <Navigate to={rotaInicialPorModulo(currentUser)} replace /> : <Login />} />
+        <Route path="/dashboard" element={<ProtectedRoute user={currentUser} required="analitico"><Dashboard /></ProtectedRoute>} />
+        <Route path="/insertion" element={<ProtectedRoute user={currentUser} required="insercao"><InsertionForm /></ProtectedRoute>} />
         {/* Fallback to Login */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

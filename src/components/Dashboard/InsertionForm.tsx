@@ -1,9 +1,11 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
+import DadosProfissionais, { type DadosProfissionaisFormState } from './DadosProfissionais';
 import Sidebar from './Sidebar';
 import { api } from '../../services/api';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import type {
+    DadosProfissionaisCatalogo,
     LegacyPatientLookupData,
     OccurrenceClassificationCatalog,
     OccurrenceExtraValue,
@@ -43,10 +45,58 @@ const extrairBairroGoogle = (componentes: google.maps.GeocoderAddressComponent[]
 const normalizarBairroParaComparacao = (bairro: string) =>
     normalizeUpper(bairro)
         .replace(/^BAIRRO\s+/, '')
+        .replace(/^BOA VISTA\s+/, '')
         .replace(/^CONJUNTO\s+/, '')
         .replace(/^CJ\s+/, '')
+        .replace(/^B\.\s+/, '')
+        .replace(/\bSEN\.\b/g, 'SENADOR')
+        .replace(/\bDR\.\b/g, 'DOUTOR')
         .replace(/^JARDIM\s+/, 'JARDIM ')
+        .replace(/\bHELIO\b/g, 'HELIO')
+        .replace(/\bCACARI\b/g, 'CACARI')
         .replace(/^TREZE DE SETEMBRO$/, '13 DE SETEMBRO');
+
+const EQUIVALENCIAS_BAIRROS: Record<string, string> = {
+    'CENTRO BOA VISTA': 'CENTRO',
+    'CENTRO DE BOA VISTA': 'CENTRO',
+    'BOA VISTA CENTRO': 'CENTRO',
+    'SAO VICENTE': 'SAO VICENTE',
+    'SAO FRANCISCO': 'SAO FRANCISCO',
+    'SENADOR HELIO CAMPOS': 'SEN. HELIO CAMPOS',
+    'SEN HELIO CAMPOS': 'SEN. HELIO CAMPOS',
+    'HELIO CAMPOS': 'SEN. HELIO CAMPOS',
+    'DOS ESTADOS': 'ESTADOS',
+    'BAIRRO DOS ESTADOS': 'ESTADOS',
+    'PARAVIANA': 'PARAVIANA',
+    'APARECIDA': 'APARECIDA',
+    'MECEJANA': 'MECEJANA',
+    'PRICUMA': 'PRICUMA',
+    'CAIMBE': 'CAIMBE',
+    'LIBERDADE': 'LIBERDADE',
+    '13 DE SETEMBRO': '13 DE SETEMBRO',
+    'TREZE DE SETEMBRO': '13 DE SETEMBRO'
+};
+
+const obterBairroEquivalente = (bairro: string) => {
+    const bairroNormalizado = normalizarBairroParaComparacao(bairro);
+    return EQUIVALENCIAS_BAIRROS[bairroNormalizado] || '';
+};
+
+const gerarVariacoesBairro = (bairro: string) => {
+    const bruto = String(bairro || '').trim().toUpperCase();
+    const normalizado = normalizarBairroParaComparacao(bairro);
+    const equivalente = obterBairroEquivalente(bairro);
+
+    return Array.from(new Set([
+        bruto,
+        normalizado,
+        equivalente,
+        normalizado.replace(/^PARQUE\s+/, ''),
+        normalizado.replace(/^JARDIM\s+/, ''),
+        normalizado.replace(/^DOUTOR\s+/, 'DR. '),
+        normalizado.replace(/^SENADOR\s+/, 'SEN. ')
+    ].filter(Boolean)));
+};
 
 const extrairBairroDosResultadosGoogle = (resultados: google.maps.GeocoderResult[] = []) => {
     for (const resultado of resultados) {
@@ -149,6 +199,44 @@ const extrairDadosNacionalidade = (valorNacionalidade: string | undefined) => {
     return { nacionalidade: 'OUTROS', outraNacionalidade: valor.toUpperCase() };
 };
 
+const MARCADOR_FAPH = 'Nº FAPH:';
+
+const extrairNumeroFaph = (infoExtra: string | undefined) => {
+    const texto = String(infoExtra ?? '').trim();
+    if (!texto) {
+        return { numeroFaph: '', infoSemFaph: '' };
+    }
+
+    const linhas = texto
+        .split(/\r?\n/)
+        .map((linha) => linha.trim())
+        .filter(Boolean);
+
+    let numeroFaph = '';
+    const linhasRestantes = linhas.filter((linha) => {
+        const linhaNormalizada = normalizeUpper(linha);
+        if (linhaNormalizada.startsWith(normalizeUpper(MARCADOR_FAPH))) {
+            numeroFaph = linha.substring(linha.indexOf(':') + 1).trim().toUpperCase();
+            return false;
+        }
+
+        return true;
+    });
+
+    return {
+        numeroFaph,
+        infoSemFaph: linhasRestantes.join('\n')
+    };
+};
+
+const montarInfoExtraComFaph = (infoExtra: string, numeroFaph: string) => {
+    const infoLimpa = extrairNumeroFaph(infoExtra).infoSemFaph;
+    const linhas = [infoLimpa.trim(), numeroFaph.trim() ? `${MARCADOR_FAPH} ${numeroFaph.trim().toUpperCase()}` : '']
+        .filter(Boolean);
+
+    return linhas.join('\n');
+};
+
 type MotivoState = {
     tipoId: string;
     subtipoId: string;
@@ -159,6 +247,15 @@ const InsertionForm: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [bairrosZonas, setBairrosZonas] = useState<Record<string, string[]>>({});
     const [patientNames, setPatientNames] = useState<string[]>([]);
+    const [catalogoDadosProfissionais, setCatalogoDadosProfissionais] = useState<DadosProfissionaisCatalogo>({
+        encaminhado: ['HGR - PRONTO ATENDIMENTO', 'HGR - TRAUMA', 'HCSA', 'PACS', 'UNIMED', 'ATENDIMENTO NO LOCAL', 'LIBERADO NO LOCAL', 'OUTROS'],
+        medicacao_contencao_quimica: ['DIAZEPAN 10MG/2ML', 'MIDAZOLAM 5MG/ML', 'ETOMIDATO 2MG/ML', 'FENITOINA 50MG/ML', 'FENOBARBITAL 100MG/ML', 'FENTANIL 50MCG/ML', 'HALOPERIDOL 5MG/ML', 'KETAMINA 50MG/ML', 'MORFINA 10MG/ML', 'SUCCINILCOLINA 100MG', 'FLUMAZENIL 0,1MG/ML', 'NALOXONE 0,4MG/ML', 'LIDOCAINA 20%', 'OUTROS'],
+        vtr: ['USA 01', 'USA 02', 'USB 01', 'USB 02', 'USB 03', 'USB 04', 'ALFA', 'OUTROS'],
+        medico_regulador: ['OUTROS'],
+        enfermeiro: ['OUTROS'],
+        medico: ['OUTROS'],
+        tecnico_enfermagem: ['OUTROS']
+    });
     const [mostrarSugestoesNome, setMostrarSugestoesNome] = useState(false);
     const [msg, setMsg] = useState<{ type: 'success' | 'info' | 'error', text: string } | null>(null);
     const [occurrenceCatalog, setOccurrenceCatalog] = useState<OccurrenceClassificationCatalog>({
@@ -178,6 +275,38 @@ const InsertionForm: React.FC = () => {
 
     // Alert State
     const [visitCount, setVisitCount] = useState<number>(0);
+    const [dadosProfissionais, setDadosProfissionais] = useState<DadosProfissionaisFormState>({
+        data_atendimento: '',
+        numero_faph: '',
+        numero_ocorrencia: '',
+        encaminhado: '',
+        medicacao_uso: '',
+        medicacoes_uso: '',
+        contencao_quimica: '',
+        medicacao_contencao_quimica: '',
+        sinais_vitais: '',
+        sinais_vitais_descricao: '',
+        contencao_fisica: '',
+        descricao_contencao_fisica: '',
+        medico_regulador: '',
+        enfermeiro: '',
+        medico: '',
+        tecnico_enfermagem: '',
+        vtr: '',
+        j9_inicio: '',
+        j10_inicio: '',
+        j9_fim: '',
+        j10_fim: '',
+        encaminhadoOutro: '',
+        medicacoesUsoLista: [''],
+        medicacoesContencaoQuimica: [''],
+        medicacoesContencaoQuimicaOutros: [''],
+        vtrOutro: '',
+        medicoReguladorOutro: '',
+        enfermeiroOutro: '',
+        medicoOutro: '',
+        tecnicoEnfermagemOutro: ''
+    });
 
     // Form State
     const [formData, setFormData] = useState({
@@ -211,13 +340,15 @@ const InsertionForm: React.FC = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [data, occurrenceData] = await Promise.all([
+                const [data, occurrenceData, professionalCatalogData] = await Promise.all([
                     api.carregarBairros(),
-                    api.carregarClassificacaoPsiquiatrica()
+                    api.carregarClassificacaoPsiquiatrica(),
+                    api.carregarCatalogoDadosProfissionais()
                 ]);
                 setBairrosZonas(data.bairros);
                 setPatientNames(data.nomes);
                 setOccurrenceCatalog(occurrenceData);
+                setCatalogoDadosProfissionais(professionalCatalogData);
 
             } catch (e) {
                 console.error("Erro ao carregar dados iniciais", e);
@@ -237,26 +368,30 @@ const InsertionForm: React.FC = () => {
         region: 'br'
     });
 
-    const encontrarBairroEZona = (bairroGoogle: string) => {
-        if (!bairroGoogle) return { bairro: '', zona: '' };
+    const encontrarBairroEZona = (bairroInformado: string) => {
+        if (!bairroInformado) return { bairroReferencia: '', zona: '' };
 
-        const normalizedNewBairro = normalizarBairroParaComparacao(bairroGoogle);
+        const candidatos = gerarVariacoesBairro(bairroInformado);
 
-        for (const [zona, bairrosList] of Object.entries(bairrosZonas)) {
-            const bairros = bairrosList as string[];
-            const match = bairros.find((bairro) =>
-                bairro === bairroGoogle ||
-                normalizarBairroParaComparacao(bairro) === normalizedNewBairro ||
-                normalizedNewBairro.includes(normalizarBairroParaComparacao(bairro)) ||
-                normalizarBairroParaComparacao(bairro).includes(normalizedNewBairro)
-            );
+        for (const candidato of candidatos) {
+            const normalizedNewBairro = normalizarBairroParaComparacao(candidato);
 
-            if (match) {
-                return { bairro: match, zona };
+            for (const [zona, bairrosList] of Object.entries(bairrosZonas)) {
+                const bairros = bairrosList as string[];
+                const match = bairros.find((bairro) =>
+                    bairro === candidato ||
+                    normalizarBairroParaComparacao(bairro) === normalizedNewBairro ||
+                    normalizedNewBairro.includes(normalizarBairroParaComparacao(bairro)) ||
+                    normalizarBairroParaComparacao(bairro).includes(normalizedNewBairro)
+                );
+
+                if (match) {
+                    return { bairroReferencia: match, zona };
+                }
             }
         }
 
-        return { bairro: '', zona: '' };
+        return { bairroReferencia: '', zona: '' };
     };
 
     const listaBairros = Object.values(bairrosZonas)
@@ -380,7 +515,7 @@ const InsertionForm: React.FC = () => {
 
                     let bairroEncontrado = encontrarBairroEZona(newBairro);
 
-                    if (!bairroEncontrado.bairro) {
+                    if (!bairroEncontrado.bairroReferencia) {
                         const bairroInferido = inferirBairroPorEnderecoENumero(newAddr, newNum);
                         if (bairroInferido) {
                             newBairro = bairroInferido;
@@ -416,8 +551,7 @@ const InsertionForm: React.FC = () => {
                             bairro: newBairro || prev.bairro
                         };
 
-                        if (bairroEncontrado.bairro) {
-                            updated.bairro = bairroEncontrado.bairro;
+                        if (bairroEncontrado.zona) {
                             updated.zona = bairroEncontrado.zona;
                         } else if (!newBairro) {
                             updated.bairro = '';
@@ -448,6 +582,38 @@ const InsertionForm: React.FC = () => {
                 setFoundPatient(null);
                 setMostrarSugestoesNome(true);
                 setMsg(null);
+                setDadosProfissionais({
+                    data_atendimento: '',
+                    numero_faph: '',
+                    numero_ocorrencia: '',
+                    encaminhado: '',
+                    medicacao_uso: '',
+                    medicacoes_uso: '',
+                    contencao_quimica: '',
+                    medicacao_contencao_quimica: '',
+                    sinais_vitais: '',
+                    sinais_vitais_descricao: '',
+                    contencao_fisica: '',
+                    descricao_contencao_fisica: '',
+                    medico_regulador: '',
+                    enfermeiro: '',
+                    medico: '',
+                    tecnico_enfermagem: '',
+                    vtr: '',
+                    j9_inicio: '',
+                    j10_inicio: '',
+                    j9_fim: '',
+                    j10_fim: '',
+                    encaminhadoOutro: '',
+                    medicacoesUsoLista: [''],
+                    medicacoesContencaoQuimica: [''],
+                    medicacoesContencaoQuimicaOutros: [''],
+                    vtrOutro: '',
+                    medicoReguladorOutro: '',
+                    enfermeiroOutro: '',
+                    medicoOutro: '',
+                    tecnicoEnfermagemOutro: ''
+                });
                 setOccurrence({
                     motivoInicial: { tipoId: '', subtipoId: '', extras: {} },
                     motivoConstatado: { tipoId: '', subtipoId: '', extras: {} },
@@ -656,6 +822,11 @@ const InsertionForm: React.FC = () => {
     const preencherCamposBasicosPaciente = (paciente: LegacyPatientLookupData) => {
         const dadosRaca = extrairDadosRaca(paciente.raca);
         const dadosNacionalidade = extrairDadosNacionalidade(paciente.nacionalidade);
+        const dadosFaph = extrairNumeroFaph(paciente.info);
+        setDadosProfissionais((prev) => ({
+            ...prev,
+            numero_faph: dadosFaph.numeroFaph || prev.numero_faph
+        }));
         setFormData((prev) => ({
             ...prev,
             id: paciente.id || prev.id,
@@ -699,7 +870,12 @@ const InsertionForm: React.FC = () => {
         const p = foundPatient;
         const dadosRaca = extrairDadosRaca(p.raca);
         const dadosNacionalidade = extrairDadosNacionalidade(p.nacionalidade);
+        const dadosFaph = extrairNumeroFaph(p.info);
         const classificacao = p.classificacao;
+        setDadosProfissionais((prev) => ({
+            ...prev,
+            numero_faph: dadosFaph.numeroFaph || prev.numero_faph
+        }));
         setFormData(prev => {
             const updated = {
                 ...prev,
@@ -725,18 +901,13 @@ const InsertionForm: React.FC = () => {
                 fam: p.fam || prev.fam,
                 pq_fam: p.pq_fam || prev.pq_fam,
                 raps: p.raps || prev.raps,
-                info: p.info || prev.info
+                info: dadosFaph.infoSemFaph || prev.info
             };
 
             // Recalc zone
             if (p.bairro) {
-                for (const [zona, bairrosList] of Object.entries(bairrosZonas)) {
-                    const bairros = bairrosList as string[];
-                    if (bairros.includes(p.bairro)) {
-                        updated.zona = zona;
-                        break;
-                    }
-                }
+                const bairroEncontrado = encontrarBairroEZona(p.bairro);
+                updated.zona = bairroEncontrado.zona || '';
             }
             return updated;
         });
@@ -833,6 +1004,8 @@ const InsertionForm: React.FC = () => {
                 finalNacionalidade = formData.outraNacionalidade;
             }
 
+            const infoExtraCompleta = montarInfoExtraComFaph(formData.info, dadosProfissionais.numero_faph);
+
             const payload: SamuAttendancePayload = {
                 id_paciente: formData.id,
                 nome: formData.nome,
@@ -852,10 +1025,33 @@ const InsertionForm: React.FC = () => {
                 apoio_fam: formData.fam,
                 porque_fam: formData.pq_fam,
                 apoio_raps: formData.raps,
-                info_extra: formData.info,
+                info_extra: infoExtraCompleta,
                 responsavel: userInfo.nomeCompleto || 'Desconhecido',
                 raca: finalRaca,
                 nacionalidade: finalNacionalidade,
+                dados_profissionais: {
+                    data_atendimento: dadosProfissionais.data_atendimento,
+                    numero_faph: dadosProfissionais.numero_faph,
+                    numero_ocorrencia: dadosProfissionais.numero_ocorrencia,
+                    encaminhado: dadosProfissionais.encaminhado,
+                    medicacao_uso: dadosProfissionais.medicacao_uso,
+                    medicacoes_uso: dadosProfissionais.medicacoes_uso,
+                    contencao_quimica: dadosProfissionais.contencao_quimica,
+                    medicacao_contencao_quimica: dadosProfissionais.medicacao_contencao_quimica,
+                    sinais_vitais: dadosProfissionais.sinais_vitais,
+                    sinais_vitais_descricao: dadosProfissionais.sinais_vitais_descricao,
+                    contencao_fisica: dadosProfissionais.contencao_fisica,
+                    descricao_contencao_fisica: dadosProfissionais.descricao_contencao_fisica,
+                    medico_regulador: dadosProfissionais.medico_regulador,
+                    enfermeiro: dadosProfissionais.enfermeiro,
+                    medico: dadosProfissionais.medico,
+                    tecnico_enfermagem: dadosProfissionais.tecnico_enfermagem,
+                    vtr: dadosProfissionais.vtr,
+                    j9_inicio: dadosProfissionais.j9_inicio,
+                    j10_inicio: dadosProfissionais.j10_inicio,
+                    j9_fim: dadosProfissionais.j9_fim,
+                    j10_fim: dadosProfissionais.j10_fim
+                },
                 classificacao_ocorrencia: {
                     motivo_inicial: {
                         tipo_id: occurrence.motivoInicial.tipoId || null,
@@ -1061,7 +1257,13 @@ const InsertionForm: React.FC = () => {
                             </div>
                             <div>
                                 <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Idade (Auto)</label>
-                                <input type="text" id="idade" value={formData.idade} readOnly className="w-full p-2.5 bg-gray-100 border border-gray-300 rounded-lg text-gray-500" />
+                                <input
+                                    type="text"
+                                    id="idade"
+                                    value={formData.idade}
+                                    onChange={handleChange}
+                                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium"
+                                />
                             </div>
                         </div>
 
@@ -1119,6 +1321,12 @@ const InsertionForm: React.FC = () => {
                                 )}
                             </div>
                         </div>
+
+                        <DadosProfissionais
+                            value={dadosProfissionais}
+                            onChange={setDadosProfissionais}
+                            catalogo={catalogoDadosProfissionais}
+                        />
 
                         {/* Endereço Row */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1236,6 +1444,7 @@ const InsertionForm: React.FC = () => {
                                     <option value="">Selecione</option>
                                     <option>Não</option>
                                     <option>Sim</option>
+                                    <option>Não Informado</option>
                                 </select>
                             </div>
                             <div>
@@ -1255,6 +1464,7 @@ const InsertionForm: React.FC = () => {
                                 <select id="med" value={formData.med} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
                                     <option>Sim</option>
                                     <option>Não</option>
+                                    <option>Não Informado</option>
                                 </select>
                             </div>
                             {formData.med === 'Não' && (
@@ -1272,6 +1482,7 @@ const InsertionForm: React.FC = () => {
                                 <select id="fam" value={formData.fam} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
                                     <option>Sim</option>
                                     <option>Não</option>
+                                    <option>Não Informado</option>
                                 </select>
                             </div>
                             {formData.fam === 'Não' && (
@@ -1294,6 +1505,7 @@ const InsertionForm: React.FC = () => {
                             <select id="raps" value={formData.raps} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
                                 <option>Não</option>
                                 <option>Sim</option>
+                                <option>Não Informado</option>
                             </select>
                         </div>
 

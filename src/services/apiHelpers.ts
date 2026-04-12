@@ -1,4 +1,4 @@
-import type { LegacyPatientLookupData, PatientLookupResult, User } from '../types';
+﻿import type { LegacyPatientLookupData, PatientLookupResult, User } from '../types';
 
 export const normalizeText = (value: any) =>
   String(value ?? '')
@@ -11,7 +11,7 @@ export const hardcodedBairros = {
   "ZONA NORTE": ["AEROPORTO", "B. DOS ESTADOS", "CAUAME", "RIVER PARK", "PARAVIANA"],
   "ZONA OESTE": ["ALVORADA", "ASA BRANCA", "BURITIS", "CAIMBE", "CINTURAO VERDE", "DR. SILVIO BOTELHO", "GENIPAPO", "EQUATORIAL", "JARDIM FLORESTA", "JARDIM TROPICAL", "JOQUEI CLUBE", "LIBERDADE", "MARECHAL RONDON", "MECEJANA", "NOVA CIDADE", "OLIMPICO", "OPERARIO", "PINTOLANDIA", "PRICUMA", "PROFESSORA ARACELI SOUTO MAIOR", "RAIAR DO SOL", "SANTA TEREZA", "SAO BENTO", "SENADOR HELIO CAMPOS", "TANCREDO NEVES", "UNION", "LAURA MOREIRA"],
   "ZONA SUL": ["13 DE SETEMBRO", "CALUNGA", "CAMBATA", "CENTRO", "SAO FRANCISCO", "SAO PEDRO", "SAO VICENTE"],
-  "ZONA LESTE": ["APARECIDA", "31 DE MARCO", "CANARINHO", "CIDADE SATELITE", "DOS ESTADOS", "JARDIM CARANA", "JARDIM PRIMAVERA", "MURILO TEIXEIRA", "PARQUE CAÃ‡ARI", "PARQUE DAS PEDRAS"],
+  "ZONA LESTE": ["APARECIDA", "31 DE MARCO", "CANARINHO", "CIDADE SATELITE", "DOS ESTADOS", "JARDIM CARANA", "JARDIM PRIMAVERA", "MURILO TEIXEIRA", "PARQUE CAÃƒâ€¡ARI", "PARQUE DAS PEDRAS"],
   "RURAL": ["AREA RURAL"]
 };
 
@@ -82,7 +82,7 @@ export const mapRecordToLegacyRow = (row: any) => [
   row.apoio_raps || '',
   row.info_extra || '',
   row.entrada_legado || formatLegacyEntry(row.criado_em, row.responsavel_nome),
-  row.responsavel_nome || 'USUÃRIO',
+  row.responsavel_nome || 'USUÃƒÂRIO',
   '',
   row.raca || '',
   row.nacionalidade || ''
@@ -111,7 +111,7 @@ export const buildStatsFromRows = (rows: any[]) => {
     const apoioRaps = normalizeText(row.apoio_raps);
     const sexo = normalizeText(row.sexo);
     const idade = String(row.idade ?? '').trim();
-    const bairro = String(row.bairro || 'NÃ£o Informado');
+    const bairro = String(row.bairro || 'NÃƒÂ£o Informado');
     const zona = String(row.zona || 'Indefinido');
     const createdAt = row.criado_em ? new Date(row.criado_em) : null;
 
@@ -178,13 +178,13 @@ export const validateOccurrenceExtras = (fields: any[], extras: Record<string, a
 
     if (field.tipo_dado === 'multiselect') {
       if (!Array.isArray(value) || value.length === 0) {
-        return `Preencha o campo obrigatÃ³rio: ${field.rotulo}`;
+        return `Preencha o campo obrigatÃƒÂ³rio: ${field.rotulo}`;
       }
       continue;
     }
 
     if (value === undefined || value === null || String(value).trim() === '') {
-      return `Preencha o campo obrigatÃ³rio: ${field.rotulo}`;
+      return `Preencha o campo obrigatÃƒÂ³rio: ${field.rotulo}`;
     }
   }
 
@@ -220,5 +220,8 @@ export const mapUsuarioToSessionUser = (usuario: any): User => ({
   nomeCompleto: usuario?.nome_completo ?? '',
   matricula: usuario?.matricula ?? '',
   funcao: usuario?.funcao ?? '',
-  modulo: usuario?.modulo ?? 'Inserção e Visualização'
+  modulo: usuario?.modulo ?? 'INSERCAO_ANALITICO',
+  ativo: usuario?.ativo !== false,
+  statusAprovacao: usuario?.status_aprovacao ?? 'aprovado'
 });
+

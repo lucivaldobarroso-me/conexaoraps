@@ -5,6 +5,8 @@ export interface User {
   matricula: string;
   funcao: string;
   modulo: string;
+  ativo?: boolean;
+  statusAprovacao?: string;
 }
 
 export interface PatientRecord {
@@ -127,6 +129,49 @@ export interface SamuOccurrenceClassificationPayload {
   detalhe_livre: string;
 }
 
+export type TipoCatalogoDadosProfissionais =
+  | 'encaminhado'
+  | 'medicacao_contencao_quimica'
+  | 'vtr'
+  | 'medico_regulador'
+  | 'enfermeiro'
+  | 'medico'
+  | 'tecnico_enfermagem';
+
+export interface DadosProfissionaisPayload {
+  data_atendimento: string;
+  numero_faph: string;
+  numero_ocorrencia: string;
+  encaminhado: string;
+  medicacao_uso: string;
+  medicacoes_uso: string;
+  contencao_quimica: string;
+  medicacao_contencao_quimica: string;
+  sinais_vitais: string;
+  sinais_vitais_descricao: string;
+  contencao_fisica: string;
+  descricao_contencao_fisica: string;
+  medico_regulador: string;
+  enfermeiro: string;
+  medico: string;
+  tecnico_enfermagem: string;
+  vtr: string;
+  j9_inicio: string;
+  j10_inicio: string;
+  j9_fim: string;
+  j10_fim: string;
+}
+
+export interface DadosProfissionaisCatalogo {
+  encaminhado: string[];
+  medicacao_contencao_quimica: string[];
+  vtr: string[];
+  medico_regulador: string[];
+  enfermeiro: string[];
+  medico: string[];
+  tecnico_enfermagem: string[];
+}
+
 export interface SamuAttendancePayload {
   id_paciente?: string;
   nome: string;
@@ -151,6 +196,7 @@ export interface SamuAttendancePayload {
   raca: string;
   nacionalidade: string;
   classificacao_ocorrencia?: SamuOccurrenceClassificationPayload | null;
+  dados_profissionais?: DadosProfissionaisPayload | null;
 }
 
 export interface SaveSamuAttendanceResult {

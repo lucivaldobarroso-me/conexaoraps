@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../services/api';
+import type { User } from '../../types';
+import { rotuloModuloAcesso, temPermissao } from '../../utils/permissoesAcesso';
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<{ nome: string; modulo: string; funcao: string } | null>(null);
+  const [user, setUser] = useState<(User & { nome?: string }) | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -14,6 +16,7 @@ const Sidebar: React.FC = () => {
     if (info) {
       const parsed = JSON.parse(info);
       setUser({
+        ...parsed,
         nome: parsed.nomeCompleto,
         modulo: parsed.modulo,
         funcao: parsed.funcao
@@ -83,18 +86,18 @@ const Sidebar: React.FC = () => {
 
           {hasAccess && (
             <>
-              {(user.modulo === 'Visualização' || user.modulo === 'Inserção e Visualização') && (
+              {temPermissao(user, 'analitico') && (
                 <button
                   onClick={() => { navigate('/dashboard'); setIsMobileMenuOpen(false); }}
-                  title={isCollapsed ? 'Dashboard' : ''}
+                  title={isCollapsed ? 'Módulo Analítico' : ''}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group w-full text-left overflow-hidden ${isActive('/dashboard') ? 'bg-white/15 text-white shadow-lg shadow-black/5 ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                 >
                   <span className="material-symbols-outlined min-w-[24px]">dashboard</span>
-                  {!isCollapsed && <span className="font-medium whitespace-nowrap">Dashboard</span>}
+                  {!isCollapsed && <span className="font-medium whitespace-nowrap">Módulo Analítico</span>}
                 </button>
               )}
 
-              {(user.modulo === 'Inserção' || user.modulo === 'Inserção e Visualização') && (
+              {temPermissao(user, 'insercao') && (
                 <button
                   onClick={() => { navigate('/insertion'); setIsMobileMenuOpen(false); }}
                   title={isCollapsed ? 'Nova Inserção' : ''}
@@ -133,7 +136,7 @@ const Sidebar: React.FC = () => {
                   {user?.nome || 'Usuário Logado'}
                 </span>
                 <span className="text-[10px] text-white/60 font-semibold uppercase tracking-wider truncate">
-                  {user?.funcao || 'Acesso'}
+                  {rotuloModuloAcesso(user?.modulo)} · {user?.funcao || 'Acesso'}
                 </span>
               </div>
             )}
@@ -145,3 +148,4 @@ const Sidebar: React.FC = () => {
 };
 
 export default Sidebar;
+

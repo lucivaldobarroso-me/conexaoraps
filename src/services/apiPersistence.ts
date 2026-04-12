@@ -5,7 +5,128 @@ import {
   normalizeText,
   validateOccurrenceExtras
 } from './apiHelpers';
-import type { SamuAttendancePayload, SaveSamuAttendanceResult } from '../types';
+import type {
+  DadosProfissionaisPayload,
+  SamuAttendancePayload,
+  SaveSamuAttendanceResult,
+  TipoCatalogoDadosProfissionais
+} from '../types';
+
+const extrairAnoAtendimento = (valor: string | undefined) => {
+  const texto = String(valor ?? '').trim();
+  if (!texto) return NaN;
+
+  const isoMatch = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) return Number(isoMatch[1]);
+
+  const localMatch = texto.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
+  if (localMatch) return Number(localMatch[3]);
+
+  const parsed = new Date(texto);
+  const year = parsed.getFullYear();
+  return Number.isNaN(year) ? NaN : year;
+};
+
+const possuiDadosProfissionais = (dados?: DadosProfissionaisPayload | null) =>
+  Boolean(
+    dados?.data_atendimento ||
+    dados?.numero_faph ||
+    dados?.numero_ocorrencia ||
+    dados?.encaminhado ||
+    dados?.medicacao_uso ||
+    dados?.medicacoes_uso ||
+    dados?.contencao_quimica ||
+    dados?.medicacao_contencao_quimica ||
+    dados?.sinais_vitais ||
+    dados?.sinais_vitais_descricao ||
+    dados?.contencao_fisica ||
+    dados?.descricao_contencao_fisica ||
+    dados?.medico_regulador ||
+    dados?.enfermeiro ||
+    dados?.medico ||
+    dados?.tecnico_enfermagem ||
+    dados?.vtr ||
+    dados?.j9_inicio ||
+    dados?.j10_inicio ||
+    dados?.j9_fim ||
+    dados?.j10_fim
+  );
+
+const salvarItemCatalogoDadosProfissionais = async (
+  tipo: TipoCatalogoDadosProfissionais,
+  valor: string
+) => {
+  const valorNormalizado = normalizeText(valor);
+  if (!valorNormalizado || valorNormalizado === 'OUTROS') return;
+
+  const { error } = await supabase
+    .from('catalogo_dados_profissionais')
+    .upsert({
+      tipo,
+      valor: valorNormalizado,
+      valor_normalizado: valorNormalizado,
+      ativo: true
+    }, { onConflict: 'tipo,valor_normalizado' });
+
+  if (error) throw error;
+};
+
+const salvarMedicacoesContencaoQuimicaCatalogo = async (valor: string) => {
+  const itens = String(valor || '')
+    .split(';')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  await Promise.all(
+    itens.map((item) => salvarItemCatalogoDadosProfissionais('medicacao_contencao_quimica', item))
+  );
+};
+
+const salvarDadosProfissionaisAtendimento = async (
+  atendimentoId: string,
+  dados: DadosProfissionaisPayload
+) => {
+  if (!possuiDadosProfissionais(dados)) return;
+
+  await Promise.all([
+    salvarItemCatalogoDadosProfissionais('encaminhado', dados.encaminhado),
+    salvarMedicacoesContencaoQuimicaCatalogo(dados.medicacao_contencao_quimica),
+    salvarItemCatalogoDadosProfissionais('vtr', dados.vtr),
+    salvarItemCatalogoDadosProfissionais('medico_regulador', dados.medico_regulador),
+    salvarItemCatalogoDadosProfissionais('enfermeiro', dados.enfermeiro),
+    salvarItemCatalogoDadosProfissionais('medico', dados.medico),
+    salvarItemCatalogoDadosProfissionais('tecnico_enfermagem', dados.tecnico_enfermagem)
+  ]);
+
+  const { error } = await supabase
+    .from('dados_profissionais_atendimento')
+    .upsert({
+      atendimento_id: atendimentoId,
+      data_atendimento: dados.data_atendimento || null,
+      numero_faph: normalizeText(dados.numero_faph) || null,
+      numero_ocorrencia: normalizeText(dados.numero_ocorrencia) || null,
+      encaminhado: normalizeText(dados.encaminhado) || null,
+      medicacao_uso: normalizeText(dados.medicacao_uso) || null,
+      medicacoes_uso: normalizeText(dados.medicacoes_uso) || null,
+      contencao_quimica: normalizeText(dados.contencao_quimica) || null,
+      medicacao_contencao_quimica: normalizeText(dados.medicacao_contencao_quimica) || null,
+      sinais_vitais: normalizeText(dados.sinais_vitais) || null,
+      sinais_vitais_descricao: normalizeText(dados.sinais_vitais_descricao) || null,
+      contencao_fisica: normalizeText(dados.contencao_fisica) || null,
+      descricao_contencao_fisica: normalizeText(dados.descricao_contencao_fisica) || null,
+      medico_regulador: normalizeText(dados.medico_regulador) || null,
+      enfermeiro: normalizeText(dados.enfermeiro) || null,
+      medico: normalizeText(dados.medico) || null,
+      tecnico_enfermagem: normalizeText(dados.tecnico_enfermagem) || null,
+      vtr: normalizeText(dados.vtr) || null,
+      j9_inicio: dados.j9_inicio || null,
+      j10_inicio: dados.j10_inicio || null,
+      j9_fim: dados.j9_fim || null,
+      j10_fim: dados.j10_fim || null
+    }, { onConflict: 'atendimento_id' });
+
+  if (error) throw error;
+};
 
 export const saveSamuAttendance = async (payload: SamuAttendancePayload): Promise<SaveSamuAttendanceResult> => {
   try {
@@ -15,7 +136,8 @@ export const saveSamuAttendance = async (payload: SamuAttendancePayload): Promis
 
     if (idsError) throw idsError;
 
-    const currentYear = new Date().getFullYear();
+    const yearFromAttendanceDate = extrairAnoAtendimento(payload.dados_profissionais?.data_atendimento);
+    const currentYear = Number.isNaN(yearFromAttendanceDate) ? new Date().getFullYear() : yearFromAttendanceDate;
     let maxSeq = 0;
 
     for (const row of existingIds ?? []) {
@@ -141,6 +263,14 @@ export const saveSamuAttendance = async (payload: SamuAttendancePayload): Promis
           await supabase.from('atendimentos_raps').delete().eq('id', data.id);
           throw classificacaoError;
         }
+      }
+    }
+
+    if (payload.dados_profissionais && data?.id) {
+      try {
+        await salvarDadosProfissionaisAtendimento(data.id, payload.dados_profissionais);
+      } catch (dadosProfissionaisError: any) {
+        console.warn('Não foi possível salvar os dados profissionais do atendimento.', dadosProfissionaisError);
       }
     }
 

@@ -7,6 +7,7 @@ import {
   loadEstatisticas,
   loadIndicadoresOcorrencia
 } from './apiDashboard';
+import { loadDadosProfissionaisCatalogo } from './apiProfessionalData';
 import { saveSamuAttendance } from './apiPersistence';
 
 export const api = {
@@ -29,6 +30,8 @@ export const api = {
   carregarIndicadoresOcorrencia: loadIndicadoresOcorrencia,
 
   carregarClassificacoesDetalhadas: loadClassificacoesDetalhadas,
+
+  carregarCatalogoDadosProfissionais: loadDadosProfissionaisCatalogo,
 
   salvarSamu: saveSamuAttendance
 };

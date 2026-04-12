@@ -19,9 +19,12 @@ create table if not exists public.usuarios (
   confirmacao_senha_legado text null,
   nome_completo text not null,
   cpf text null,
+  auth_user_id uuid unique null,
+  email_auth text unique null,
   matricula text null,
   funcao text null,
   status text null,
+  status_aprovacao text not null default 'pendente',
   justificativa text null,
   modulo text null,
   origem_dado text not null default 'sheets',
@@ -31,6 +34,9 @@ create table if not exists public.usuarios (
 );
 
 create index if not exists idx_usuarios_cpf on public.usuarios(cpf);
+create index if not exists idx_usuarios_auth_user_id on public.usuarios(auth_user_id);
+create index if not exists idx_usuarios_email_auth on public.usuarios(email_auth);
+create index if not exists idx_usuarios_status_aprovacao on public.usuarios(status_aprovacao);
 create index if not exists idx_usuarios_matricula on public.usuarios(matricula);
 create index if not exists idx_usuarios_nome on public.usuarios(nome_completo);
 
@@ -349,3 +355,137 @@ left join public.zonas z on z.id = a.zona_id;
 --    - gravar em Sheets + Supabase
 --    - validar equivalencia
 --    - depois migrar leitura para Supabase
+
+-- =========================================================
+-- 11. COMPLEMENTO DE DADOS PROFISSIONAIS E OPERACIONAIS
+-- =========================================================
+
+create table if not exists public.catalogo_dados_profissionais (
+  id uuid primary key default gen_random_uuid(),
+  tipo text not null check (tipo in ('encaminhado', 'medicacao_contencao_quimica', 'vtr', 'medico_regulador', 'enfermeiro', 'medico', 'tecnico_enfermagem')),
+  valor text not null,
+  valor_normalizado text not null,
+  ativo boolean not null default true,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now(),
+  unique (tipo, valor_normalizado)
+);
+
+create index if not exists idx_catalogo_dados_profissionais_tipo
+  on public.catalogo_dados_profissionais (tipo, ativo, valor);
+
+create table if not exists public.dados_profissionais_atendimento (
+  id uuid primary key default gen_random_uuid(),
+  atendimento_id uuid not null references public.atendimentos_raps(id) on delete cascade,
+  data_atendimento date,
+  numero_faph text,
+  numero_ocorrencia text,
+  encaminhado text,
+  medicacao_uso text,
+  medicacoes_uso text,
+  contencao_quimica text,
+  medicacao_contencao_quimica text,
+  sinais_vitais text,
+  sinais_vitais_descricao text,
+  contencao_fisica text,
+  descricao_contencao_fisica text,
+  medico_regulador text,
+  enfermeiro text,
+  medico text,
+  tecnico_enfermagem text,
+  vtr text,
+  j9_inicio time,
+  j10_inicio time,
+  j9_fim time,
+  j10_fim time,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now(),
+  unique (atendimento_id)
+);
+
+insert into public.catalogo_dados_profissionais (tipo, valor, valor_normalizado)
+values
+  ('encaminhado', 'HGR - PRONTO ATENDIMENTO', 'HGR - PRONTO ATENDIMENTO'),
+  ('encaminhado', 'HGR - TRAUMA', 'HGR - TRAUMA'),
+  ('encaminhado', 'HCSA', 'HCSA'),
+  ('encaminhado', 'PACS', 'PACS'),
+  ('encaminhado', 'UNIMED', 'UNIMED'),
+  ('encaminhado', 'ATENDIMENTO NO LOCAL', 'ATENDIMENTO NO LOCAL'),
+  ('encaminhado', 'LIBERADO NO LOCAL', 'LIBERADO NO LOCAL'),
+  ('encaminhado', 'OUTROS', 'OUTROS'),
+  ('medicacao_contencao_quimica', 'DIAZEPAN 10MG/2ML', 'DIAZEPAN 10MG/2ML'),
+  ('medicacao_contencao_quimica', 'MIDAZOLAM 5MG/ML', 'MIDAZOLAM 5MG/ML'),
+  ('medicacao_contencao_quimica', 'ETOMIDATO 2MG/ML', 'ETOMIDATO 2MG/ML'),
+  ('medicacao_contencao_quimica', 'FENITOINA 50MG/ML', 'FENITOINA 50MG/ML'),
+  ('medicacao_contencao_quimica', 'FENOBARBITAL 100MG/ML', 'FENOBARBITAL 100MG/ML'),
+  ('medicacao_contencao_quimica', 'FENTANIL 50MCG/ML', 'FENTANIL 50MCG/ML'),
+  ('medicacao_contencao_quimica', 'HALOPERIDOL 5MG/ML', 'HALOPERIDOL 5MG/ML'),
+  ('medicacao_contencao_quimica', 'KETAMINA 50MG/ML', 'KETAMINA 50MG/ML'),
+  ('medicacao_contencao_quimica', 'MORFINA 10MG/ML', 'MORFINA 10MG/ML'),
+  ('medicacao_contencao_quimica', 'SUCCINILCOLINA 100MG', 'SUCCINILCOLINA 100MG'),
+  ('medicacao_contencao_quimica', 'FLUMAZENIL 0,1MG/ML', 'FLUMAZENIL 0,1MG/ML'),
+  ('medicacao_contencao_quimica', 'NALOXONE 0,4MG/ML', 'NALOXONE 0,4MG/ML'),
+  ('medicacao_contencao_quimica', 'LIDOCAINA 20%', 'LIDOCAINA 20%'),
+  ('medicacao_contencao_quimica', 'OUTROS', 'OUTROS'),
+  ('vtr', 'USA 01', 'USA 01'),
+  ('vtr', 'USA 02', 'USA 02'),
+  ('vtr', 'USB 01', 'USB 01'),
+  ('vtr', 'USB 02', 'USB 02'),
+  ('vtr', 'USB 03', 'USB 03'),
+  ('vtr', 'USB 04', 'USB 04'),
+  ('vtr', 'ALFA', 'ALFA'),
+  ('vtr', 'OUTROS', 'OUTROS')
+on conflict (tipo, valor_normalizado) do nothing;
+
+insert into public.catalogo_dados_profissionais (tipo, valor, valor_normalizado)
+values
+  ('tecnico_enfermagem', 'AMILTON VIANA LOPES', 'AMILTON VIANA LOPES'),
+  ('tecnico_enfermagem', 'ANA PATRICIA DA SILVA SOARES', 'ANA PATRICIA DA SILVA SOARES'),
+  ('tecnico_enfermagem', 'ANTONIO OTON DIAS DA SILVA', 'ANTONIO OTON DIAS DA SILVA'),
+  ('tecnico_enfermagem', 'ARLETE SILVA OLIVEIRA', 'ARLETE SILVA OLIVEIRA'),
+  ('tecnico_enfermagem', 'BETANIA SAVIA MAGALHAES PEREIRA', 'BETANIA SAVIA MAGALHAES PEREIRA'),
+  ('tecnico_enfermagem', 'DEYRMYSSON DA SILVA SANTOS', 'DEYRMYSSON DA SILVA SANTOS'),
+  ('tecnico_enfermagem', 'DOUGLAS ALBERTO QUARESMA', 'DOUGLAS ALBERTO QUARESMA'),
+  ('tecnico_enfermagem', 'DYONES CLEN AUGUSTO DE LIMA MELO', 'DYONES CLEN AUGUSTO DE LIMA MELO'),
+  ('tecnico_enfermagem', 'ERONILDES FARIAS DE SOUZA', 'ERONILDES FARIAS DE SOUZA'),
+  ('tecnico_enfermagem', 'FABIANA CARVALHO RAMOS', 'FABIANA CARVALHO RAMOS'),
+  ('tecnico_enfermagem', 'FRANCISCA DO CANTO REIS', 'FRANCISCA DO CANTO REIS'),
+  ('tecnico_enfermagem', 'HICARO YVES DA SILVA SANTOS', 'HICARO YVES DA SILVA SANTOS'),
+  ('tecnico_enfermagem', 'JANETE TABOSA', 'JANETE TABOSA'),
+  ('tecnico_enfermagem', 'JOSUE SILVA DE ARRUDA', 'JOSUE SILVA DE ARRUDA'),
+  ('tecnico_enfermagem', 'JUCIE RIBEIRO COSTA', 'JUCIE RIBEIRO COSTA'),
+  ('tecnico_enfermagem', 'KENNEDY PEREIRA DA SILVA', 'KENNEDY PEREIRA DA SILVA'),
+  ('tecnico_enfermagem', 'MANOEL LUIZ DE SOUZA SANTOS', 'MANOEL LUIZ DE SOUZA SANTOS'),
+  ('tecnico_enfermagem', 'MARIVALDA LOPES DO NASCIMENTO', 'MARIVALDA LOPES DO NASCIMENTO'),
+  ('tecnico_enfermagem', 'ROBERDSON PEREIRA DE ALCANTARA', 'ROBERDSON PEREIRA DE ALCANTARA'),
+  ('tecnico_enfermagem', 'SHIRLEY LIMA DA SILVA', 'SHIRLEY LIMA DA SILVA'),
+  ('tecnico_enfermagem', 'TACIMAR DA SILVA PEREIRA', 'TACIMAR DA SILVA PEREIRA'),
+  ('tecnico_enfermagem', 'OUTROS', 'OUTROS'),
+  ('enfermeiro', 'DANIEL GUIMARAES DA SILVA', 'DANIEL GUIMARAES DA SILVA'),
+  ('enfermeiro', 'EDSON SOARES PINTO', 'EDSON SOARES PINTO'),
+  ('enfermeiro', 'GEISA CAMILA MOREIRA TAVARES DE MENEZES', 'GEISA CAMILA MOREIRA TAVARES DE MENEZES'),
+  ('enfermeiro', 'GERLIVANE ALVES DE FREITAS SOUSA', 'GERLIVANE ALVES DE FREITAS SOUSA'),
+  ('enfermeiro', 'LUCIANO JOSE COUTINHO', 'LUCIANO JOSE COUTINHO'),
+  ('enfermeiro', 'LUCIVALDO OLIVEIRA BARROSO', 'LUCIVALDO OLIVEIRA BARROSO'),
+  ('enfermeiro', 'MARIA DE LA PAZ PEREZ SAMPAIO', 'MARIA DE LA PAZ PEREZ SAMPAIO'),
+  ('enfermeiro', 'MARINETE GOMES BARRETO', 'MARINETE GOMES BARRETO'),
+  ('enfermeiro', 'SARA BRENDA DE SOUSA JESUS', 'SARA BRENDA DE SOUSA JESUS'),
+  ('enfermeiro', 'SHEYLA BATISTA DOS SANTOS', 'SHEYLA BATISTA DOS SANTOS'),
+  ('enfermeiro', 'GALTHAMA BRASIL', 'GALTHAMA BRASIL'),
+  ('enfermeiro', 'OUTROS', 'OUTROS'),
+  ('medico', 'ALEXANDRE FEITOSA DA SILVA', 'ALEXANDRE FEITOSA DA SILVA'),
+  ('medico', 'CLAUDIA KLECYANNE RODRIGUES DE BRITO', 'CLAUDIA KLECYANNE RODRIGUES DE BRITO'),
+  ('medico', 'DANNIEL SILVA DA ROCHA', 'DANNIEL SILVA DA ROCHA'),
+  ('medico', 'FRANCISCO ELADIO CAVALCANTE', 'FRANCISCO ELADIO CAVALCANTE'),
+  ('medico', 'JEFFERSON MARTINS DE LIMA', 'JEFFERSON MARTINS DE LIMA'),
+  ('medico', 'LEIDIANA COSTA NOBLES', 'LEIDIANA COSTA NOBLES'),
+  ('medico', 'MARCOS VINICIUS VERAS DA ROCHA', 'MARCOS VINICIUS VERAS DA ROCHA'),
+  ('medico', 'ROGER MALACARNE CALEFFI', 'ROGER MALACARNE CALEFFI'),
+  ('medico', 'VALTECY MENDES ALMEIDA DE ALBUQUERQUE', 'VALTECY MENDES ALMEIDA DE ALBUQUERQUE'),
+  ('medico', 'CELSO EDUARDO COSTA NERY', 'CELSO EDUARDO COSTA NERY'),
+  ('medico', 'FELIPE LEITE BARROS', 'FELIPE LEITE BARROS'),
+  ('medico', 'PAULO VICTOR PAZ MACHADO', 'PAULO VICTOR PAZ MACHADO'),
+  ('medico', 'TIAGO DE LIMA RODRIGUEZ', 'TIAGO DE LIMA RODRIGUEZ'),
+  ('medico', 'OUTROS', 'OUTROS'),
+  ('medico_regulador', 'OUTROS', 'OUTROS')
+on conflict (tipo, valor_normalizado) do nothing;

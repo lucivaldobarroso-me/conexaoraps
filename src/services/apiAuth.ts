@@ -1,11 +1,29 @@
 import { supabase } from './supabase';
 import { buildAuthEmail, mapUsuarioToSessionUser } from './apiHelpers';
 import { clearUserInfo, readStoredUserInfo, storeUserInfo, withTimeout } from './apiSession';
+import { isAdminPrincipal, normalizarModuloAcesso } from '../utils/permissoesAcesso';
+
+const USUARIO_PROFILE_SELECT = 'id, usuario, nome_completo, matricula, funcao, modulo, auth_user_id, ativo, status_aprovacao, email_auth, cpf';
+
+const traduzirErroAuth = (message: string) => {
+  const texto = String(message ?? '').trim();
+  const normalizado = texto.toLowerCase();
+
+  if (!texto) return 'Erro de autenticação no Supabase.';
+  if (normalizado.includes('invalid login credentials')) return 'Usuário, e-mail ou senha inválidos.';
+  if (normalizado.includes('email') && normalizado.includes('invalid')) return 'Informe um e-mail ou usuário válido.';
+  if (normalizado.includes('email not confirmed')) return 'E-mail ainda não confirmado. Verifique o cadastro ou desative a confirmação de e-mail no Supabase.';
+  if (normalizado.includes('user already registered')) return 'Este e-mail já está cadastrado.';
+  if (normalizado.includes('password')) return 'A senha informada não atende aos critérios de segurança.';
+  if (normalizado.includes('rate limit')) return 'Muitas tentativas em pouco tempo. Aguarde alguns instantes e tente novamente.';
+
+  return texto;
+};
 
 const fetchUsuarioProfile = async (authUserId: string) => {
   const { data, error } = await supabase
     .from('usuarios')
-    .select('id, usuario, nome_completo, matricula, funcao, modulo, auth_user_id')
+    .select(USUARIO_PROFILE_SELECT)
     .eq('auth_user_id', authUserId)
     .maybeSingle();
 
@@ -13,10 +31,69 @@ const fetchUsuarioProfile = async (authUserId: string) => {
   return data;
 };
 
-const ensureUsuarioProfile = async (authUser: any, fallback?: Record<string, any>) => {
+const fetchUsuarioProfileByEmail = async (email: string) => {
+  const emailNormalizado = String(email ?? '').trim().toLowerCase();
+  if (!emailNormalizado) return null;
+
+  const { data, error } = await supabase
+    .from('usuarios')
+    .select(USUARIO_PROFILE_SELECT)
+    .eq('email_auth', emailNormalizado)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+};
+
+const resolveLoginEmail = async (usuario: string) => {
+  const entrada = String(usuario ?? '').trim();
+  if (entrada.includes('@')) return entrada.toLowerCase();
+
+  const usuarioNormalizado = entrada.toUpperCase();
+  const { data, error } = await supabase.rpc('buscar_email_login_usuario', {
+    p_usuario: usuarioNormalizado
+  });
+
+  const emailAuth = Array.isArray(data) ? data[0]?.email_auth : data?.email_auth;
+  if (!error && emailAuth) return String(emailAuth).toLowerCase();
+
+  if (error) {
+    console.warn('Não foi possível resolver o e-mail pelo usuário. Usando fallback legado.', error);
+  }
+
+  return buildAuthEmail(usuarioNormalizado);
+};
+
+const ensureUsuarioProfile = async (authUser: any, fallback?: Record<string, any>, options?: { allowPending?: boolean }) => {
   let profile = await fetchUsuarioProfile(authUser.id);
+  const authEmail = String(authUser.email ?? '').trim().toLowerCase();
+
+  if (!profile && authEmail) {
+    const existingProfile = await fetchUsuarioProfileByEmail(authEmail);
+
+    if (existingProfile) {
+      const adminPrincipal = isAdminPrincipal(existingProfile);
+      const { error: updateError } = await supabase
+        .from('usuarios')
+        .update({
+          auth_user_id: authUser.id,
+          modulo: adminPrincipal ? 'ADMINISTRADOR' : normalizarModuloAcesso(existingProfile.modulo),
+          ativo: adminPrincipal ? true : existingProfile.ativo,
+          status_aprovacao: adminPrincipal ? 'aprovado' : existingProfile.status_aprovacao
+        })
+        .eq('id', existingProfile.id);
+
+      if (updateError) throw updateError;
+      profile = await fetchUsuarioProfile(authUser.id);
+    }
+  }
 
   if (!profile && fallback) {
+    const isAdmin = isAdminPrincipal({
+      usuario: fallback.usuario,
+      cpf: fallback.cpf,
+      email: fallback.email_auth ?? authUser.email
+    });
     const payload = {
       auth_user_id: authUser.id,
       email_auth: String(fallback.email_auth ?? authUser.email ?? '').trim().toLowerCase() || null,
@@ -25,9 +102,10 @@ const ensureUsuarioProfile = async (authUser: any, fallback?: Record<string, any
       cpf: String(fallback.cpf ?? '').trim() || null,
       matricula: String(fallback.matricula ?? '').trim().toUpperCase() || null,
       funcao: String(fallback.funcao ?? '').trim().toUpperCase() || null,
-      modulo: String(fallback.modulo ?? 'Inserção e Visualização').trim(),
+      modulo: isAdmin ? 'ADMINISTRADOR' : normalizarModuloAcesso(fallback.modulo ?? 'INSERCAO_ANALITICO'),
       origem_dado: 'supabase',
-      ativo: true
+      ativo: isAdmin,
+      status_aprovacao: isAdmin ? 'aprovado' : 'pendente'
     };
 
     const { error: insertError } = await supabase
@@ -42,6 +120,19 @@ const ensureUsuarioProfile = async (authUser: any, fallback?: Record<string, any
     throw new Error('Perfil do usuário não encontrado no Supabase.');
   }
 
+  const adminPrincipal = isAdminPrincipal(profile);
+  if (adminPrincipal) {
+    profile = {
+      ...profile,
+      modulo: 'ADMINISTRADOR',
+      ativo: true,
+      status_aprovacao: 'aprovado'
+    };
+  }
+  if (!options?.allowPending && !adminPrincipal && (profile.ativo === false || profile.status_aprovacao !== 'aprovado')) {
+    throw new Error('Cadastro em análise. Seu acesso será liberado após aprovação do administrador.');
+  }
+
   const mapped = mapUsuarioToSessionUser(profile);
   storeUserInfo(mapped);
   return mapped;
@@ -49,9 +140,7 @@ const ensureUsuarioProfile = async (authUser: any, fallback?: Record<string, any
 
 export const loginWithSupabase = async (usuario: string, senha: string) => {
   try {
-    const email = String(usuario ?? '').includes('@')
-      ? String(usuario).trim().toLowerCase()
-      : buildAuthEmail(usuario);
+    const email = await resolveLoginEmail(usuario);
     const { data, error } = await withTimeout(
       supabase.auth.signInWithPassword({
         email,
@@ -72,14 +161,18 @@ export const loginWithSupabase = async (usuario: string, senha: string) => {
 
     return {
       result: 'success',
+      id: profile.id,
+      usuario: profile.usuario,
       nomeCompleto: profile.nomeCompleto,
       modulo: profile.modulo,
       funcao: profile.funcao,
       matricula: profile.matricula,
+      ativo: profile.ativo,
+      statusAprovacao: profile.statusAprovacao,
       message: 'Login realizado com sucesso!'
     };
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Erro de autenticação no Supabase';
+    const message = traduzirErroAuth(e instanceof Error ? e.message : 'Erro de autenticação no Supabase');
     return { result: 'error', message };
   }
 };
@@ -119,15 +212,15 @@ export const registerWithSupabase = async (dados: any) => {
       cpf: dados.cpf,
       matricula: dados.matricula,
       funcao: dados.funcao,
-      modulo: 'Inserção e Visualização'
-    });
+      modulo: dados.moduloAcesso || 'INSERCAO_ANALITICO'
+    }, { allowPending: true });
 
     await supabase.auth.signOut();
     clearUserInfo();
 
-    return { result: 'success', message: 'Conta criada com sucesso! Faça login para continuar.' };
+    return { result: 'success', message: 'Cadastro enviado para análise. Você poderá acessar sua conta após aprovação do administrador.' };
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Erro ao realizar cadastro';
+    const message = traduzirErroAuth(e instanceof Error ? e.message : 'Erro ao realizar cadastro');
     return { result: 'error', message };
   }
 };
@@ -167,3 +260,4 @@ export const logoutFromSupabase = async () => {
     clearUserInfo();
   }
 };
+

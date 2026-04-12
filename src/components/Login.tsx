@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LOGIN_BG_PATTERN } from '../constants';
 import { api } from '../services/api';
+import { rotaInicialPorModulo } from '../utils/permissoesAcesso';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showPendingModal, setShowPendingModal] = useState(false);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +23,7 @@ const Login: React.FC = () => {
     matricula: '',
     funcao: '',
     usuario: '',
+    moduloAcesso: 'INSERCAO',
     senha: '',
     confirmarSenha: ''
   });
@@ -28,7 +31,11 @@ const Login: React.FC = () => {
   useEffect(() => {
     const existingUser = localStorage.getItem('user_info');
     if (existingUser) {
-      navigate('/dashboard');
+      try {
+        navigate(rotaInicialPorModulo(JSON.parse(existingUser)));
+      } catch {
+        localStorage.removeItem('user_info');
+      }
     }
   }, [navigate]);
 
@@ -59,15 +66,18 @@ const Login: React.FC = () => {
         localStorage.setItem(
           'user_info',
           JSON.stringify({
+            id: data.id,
+            usuario: data.usuario || username.toUpperCase(),
             nomeCompleto: data.nomeCompleto,
             modulo: data.modulo,
             funcao: data.funcao,
             matricula: data.matricula,
-            usuario: username.toUpperCase()
+            ativo: data.ativo,
+            statusAprovacao: data.statusAprovacao
           })
         );
         setSuccess(data.message || 'Login realizado com sucesso!');
-        setTimeout(() => navigate('/dashboard'), 800);
+        setTimeout(() => navigate(rotaInicialPorModulo({ modulo: data.modulo })), 800);
       } else {
         setError(data.message || 'Erro ao realizar login');
       }
@@ -110,10 +120,11 @@ const Login: React.FC = () => {
       const result = await api.registrar(regData);
       if (result.result === 'success') {
         setSuccess(result.message);
+        setShowPendingModal(true);
         setTimeout(() => {
           setIsLogin(true);
           setSuccess('');
-        }, 1800);
+        }, 800);
       } else {
         setError(result.message);
       }
@@ -188,7 +199,7 @@ const Login: React.FC = () => {
             <form onSubmit={handleLogin} className="flex flex-col gap-4 px-8 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 uppercase" htmlFor="username">
-                  E-mail
+                  E-mail ou Usuário
                 </label>
                 <div className="relative group">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[20px] text-slate-400 group-focus-within:text-brand-medium transition-colors">
@@ -196,10 +207,10 @@ const Login: React.FC = () => {
                   </span>
                   <input
                     id="username"
-                    type="email"
+                    type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="seuemail@dominio.com"
+                    placeholder="seuemail@dominio.com ou usuário"
                     className="w-full h-12 pl-12 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 focus:bg-white dark:focus:bg-slate-900 focus:ring-4 focus:ring-brand-medium/5 outline-none transition-all font-medium"
                   />
                 </div>
@@ -264,6 +275,21 @@ const Login: React.FC = () => {
                     onChange={handleInputChange}
                     className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium"
                   />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="moduloAcesso">
+                    Módulo de Acesso
+                  </label>
+                  <select
+                    id="moduloAcesso"
+                    value={regData.moduloAcesso}
+                    onChange={handleInputChange}
+                    className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium"
+                  >
+                    <option value="INSERCAO">Inserção</option>
+                    <option value="ANALITICO">Analítico</option>
+                    <option value="INSERCAO_ANALITICO">Inserção e Analítico</option>
+                  </select>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -374,6 +400,30 @@ const Login: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {showPendingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-white/60 bg-white p-7 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-light/40 text-brand-medium">
+              <span className="material-symbols-outlined text-[30px]">admin_panel_settings</span>
+            </div>
+            <h2 className="mb-2 text-xl font-black text-brand-dark">Cadastro enviado para análise</h2>
+            <p className="mb-6 text-sm leading-relaxed text-slate-600">
+              Você poderá acessar sua conta após a análise e aprovação do administrador do sistema.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setShowPendingModal(false);
+                setIsLogin(true);
+              }}
+              className="h-11 w-full rounded-xl bg-brand-medium font-bold text-white shadow-lg shadow-brand-medium/20 transition-all hover:bg-brand-dark"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
