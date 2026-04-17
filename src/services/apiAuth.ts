@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { buildAuthEmail, mapUsuarioToSessionUser } from './apiHelpers';
-import { clearUserInfo, readStoredUserInfo, storeUserInfo, withTimeout } from './apiSession';
-import { isAdminPrincipal, normalizarModuloAcesso } from '../utils/permissoesAcesso';
+import { clearUserInfo, storeUserInfo, withTimeout } from './apiSession';
+import { normalizarModuloAcesso } from '../utils/permissoesAcesso';
 
 const USUARIO_PROFILE_SELECT = 'id, usuario, nome_completo, matricula, funcao, modulo, auth_user_id, ativo, status_aprovacao, email_auth, cpf';
 
@@ -72,14 +72,13 @@ const ensureUsuarioProfile = async (authUser: any, fallback?: Record<string, any
     const existingProfile = await fetchUsuarioProfileByEmail(authEmail);
 
     if (existingProfile) {
-      const adminPrincipal = isAdminPrincipal(existingProfile);
       const { error: updateError } = await supabase
         .from('usuarios')
         .update({
           auth_user_id: authUser.id,
-          modulo: adminPrincipal ? 'ADMINISTRADOR' : normalizarModuloAcesso(existingProfile.modulo),
-          ativo: adminPrincipal ? true : existingProfile.ativo,
-          status_aprovacao: adminPrincipal ? 'aprovado' : existingProfile.status_aprovacao
+          modulo: normalizarModuloAcesso(existingProfile.modulo),
+          ativo: existingProfile.ativo,
+          status_aprovacao: existingProfile.status_aprovacao
         })
         .eq('id', existingProfile.id);
 
@@ -89,11 +88,6 @@ const ensureUsuarioProfile = async (authUser: any, fallback?: Record<string, any
   }
 
   if (!profile && fallback) {
-    const isAdmin = isAdminPrincipal({
-      usuario: fallback.usuario,
-      cpf: fallback.cpf,
-      email: fallback.email_auth ?? authUser.email
-    });
     const payload = {
       auth_user_id: authUser.id,
       email_auth: String(fallback.email_auth ?? authUser.email ?? '').trim().toLowerCase() || null,
@@ -102,10 +96,10 @@ const ensureUsuarioProfile = async (authUser: any, fallback?: Record<string, any
       cpf: String(fallback.cpf ?? '').trim() || null,
       matricula: String(fallback.matricula ?? '').trim().toUpperCase() || null,
       funcao: String(fallback.funcao ?? '').trim().toUpperCase() || null,
-      modulo: isAdmin ? 'ADMINISTRADOR' : normalizarModuloAcesso(fallback.modulo ?? 'INSERCAO_ANALITICO'),
+      modulo: normalizarModuloAcesso(fallback.modulo ?? 'INSERCAO_ANALITICO'),
       origem_dado: 'supabase',
-      ativo: isAdmin,
-      status_aprovacao: isAdmin ? 'aprovado' : 'pendente'
+      ativo: false,
+      status_aprovacao: 'pendente'
     };
 
     const { error: insertError } = await supabase
@@ -120,16 +114,7 @@ const ensureUsuarioProfile = async (authUser: any, fallback?: Record<string, any
     throw new Error('Perfil do usuário não encontrado no Supabase.');
   }
 
-  const adminPrincipal = isAdminPrincipal(profile);
-  if (adminPrincipal) {
-    profile = {
-      ...profile,
-      modulo: 'ADMINISTRADOR',
-      ativo: true,
-      status_aprovacao: 'aprovado'
-    };
-  }
-  if (!options?.allowPending && !adminPrincipal && (profile.ativo === false || profile.status_aprovacao !== 'aprovado')) {
+  if (!options?.allowPending && (profile.ativo === false || profile.status_aprovacao !== 'aprovado')) {
     throw new Error('Cadastro em análise. Seu acesso será liberado após aprovação do administrador.');
   }
 
@@ -246,8 +231,6 @@ export const restoreSessionUser = async () => {
     );
   } catch (e) {
     console.error('Erro ao restaurar sessão do Supabase:', e);
-    const cachedUser = readStoredUserInfo();
-    if (cachedUser) return cachedUser;
     clearUserInfo();
     return null;
   }

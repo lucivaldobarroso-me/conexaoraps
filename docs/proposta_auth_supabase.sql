@@ -26,14 +26,14 @@ set status_aprovacao = 'aprovado'
 where ativo = true
   and (status_aprovacao is null or status_aprovacao = '');
 
-update public.usuarios
-set modulo = 'ADMINISTRADOR',
-    ativo = true,
-    status_aprovacao = 'aprovado',
-    email_auth = coalesce(email_auth, 'lucivaldobarroso.me@gmail.com')
-where upper(coalesce(usuario, '')) = 'LUCIVALDOBARROSO'
-   or regexp_replace(coalesce(cpf, ''), '\D', '', 'g') = '88436039220'
-   or lower(coalesce(email_auth, '')) = 'lucivaldobarroso.me@gmail.com';
+-- Defina administradores manualmente pelo painel/SQL usando um identificador
+-- confirmado no Supabase Auth. Nao deixe CPF/e-mail pessoal fixo no codigo.
+-- Exemplo:
+-- update public.usuarios
+-- set modulo = 'ADMINISTRADOR',
+--     ativo = true,
+--     status_aprovacao = 'aprovado'
+-- where auth_user_id = '<uuid-do-admin>';
 
 alter table public.usuarios enable row level security;
 

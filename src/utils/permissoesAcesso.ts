@@ -3,12 +3,6 @@ import type { User } from '../types';
 export type ModuloAcessoCodigo = 'ADMINISTRADOR' | 'INSERCAO' | 'ANALITICO' | 'INSERCAO_ANALITICO';
 export type AcaoAcesso = 'insercao' | 'analitico' | 'administracao';
 
-export const ADMIN_PRINCIPAL = {
-  usuario: 'LUCIVALDOBARROSO',
-  cpf: '88436039220',
-  email: 'lucivaldobarroso.me@gmail.com'
-};
-
 const normalizarTexto = (valor: unknown) =>
   String(valor ?? '')
     .normalize('NFD')
@@ -32,14 +26,6 @@ export const normalizarModuloAcesso = (modulo: unknown): ModuloAcessoCodigo => {
   }
 
   return 'INSERCAO_ANALITICO';
-};
-
-export const isAdminPrincipal = (dados: { usuario?: unknown; cpf?: unknown; email?: unknown; email_auth?: unknown }) => {
-  const usuario = normalizarTexto(dados.usuario);
-  const cpf = String(dados.cpf ?? '').replace(/\D/g, '');
-  const email = String(dados.email ?? dados.email_auth ?? '').trim().toLowerCase();
-
-  return usuario === ADMIN_PRINCIPAL.usuario || cpf === ADMIN_PRINCIPAL.cpf || email === ADMIN_PRINCIPAL.email;
 };
 
 export const rotuloModuloAcesso = (modulo: unknown) => {

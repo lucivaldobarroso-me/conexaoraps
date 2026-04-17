@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LOGIN_BG_PATTERN } from '../constants';
 import { api } from '../services/api';
 import { rotaInicialPorModulo } from '../utils/permissoesAcesso';
 
@@ -27,17 +26,6 @@ const Login: React.FC = () => {
     senha: '',
     confirmarSenha: ''
   });
-
-  useEffect(() => {
-    const existingUser = localStorage.getItem('user_info');
-    if (existingUser) {
-      try {
-        navigate(rotaInicialPorModulo(JSON.parse(existingUser)));
-      } catch {
-        localStorage.removeItem('user_info');
-      }
-    }
-  }, [navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -137,277 +125,213 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col overflow-hidden items-center justify-center bg-background-light dark:bg-background-dark py-12 px-4">
-      <div className="absolute top-[-10%] left-[-5%] h-[600px] w-[600px] rounded-full bg-brand-medium/5 blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[-10%] right-[-5%] h-[500px] w-[500px] rounded-full bg-brand-accent/10 blur-[100px] pointer-events-none"></div>
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ backgroundImage: `url('${LOGIN_BG_PATTERN}')`, maskImage: 'linear-gradient(to bottom, white, transparent)' }}
-      ></div>
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-x-hidden overflow-y-auto bg-[#f8f9fa] px-4 pb-10 pt-24 text-slate-900 sm:py-10">
+      <div className="absolute left-[-10rem] top-[-8rem] h-96 w-96 rounded-full bg-[#9cefde]/60 blur-3xl" />
+      <div className="absolute bottom-[-12rem] right-[-8rem] h-[34rem] w-[34rem] rounded-full bg-blue-100 blur-3xl" />
 
-      <div className="layout-container relative z-10 flex w-full max-w-[500px] flex-col items-center">
-        <div className="w-full rounded-3xl bg-card-light dark:bg-card-dark shadow-2xl border border-white/50 dark:border-slate-700/50 backdrop-blur-sm overflow-hidden transition-all duration-500">
-          <div className="flex flex-col items-center px-8 pt-10 pb-4 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-light to-white shadow-md border border-brand-light dark:from-slate-700 dark:to-slate-800 dark:border-slate-600 group transition-all duration-300">
-              <span
-                className="material-symbols-outlined text-brand-medium dark:text-brand-accent transition-transform duration-300 group-hover:rotate-12"
-                style={{ fontSize: '32px' }}
-              >
-                health_metrics
-              </span>
+      <button
+        type="button"
+        onClick={() => navigate('/')}
+        className="absolute left-5 top-5 z-20 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-2 text-sm font-bold text-[#003f81] shadow-sm backdrop-blur-md transition-all hover:-translate-y-0.5 hover:bg-white"
+      >
+        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+        Página inicial
+      </button>
+
+      <div className="relative z-10 grid w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-200 sm:rounded-[2.4rem] lg:grid-cols-[1.05fr_0.95fr]">
+        <aside className="relative hidden min-h-[680px] overflow-hidden bg-[#003f81] p-10 text-white lg:flex lg:flex-col lg:justify-between">
+          <div className="absolute right-[-7rem] top-[-7rem] h-80 w-80 rounded-full bg-[#9cefde]/20 blur-2xl" />
+          <div className="absolute bottom-[-8rem] left-[-8rem] h-96 w-96 rounded-full bg-white/10 blur-3xl" />
+
+          <div className="relative">
+            <div className="mb-10 flex items-center gap-3">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#003f81] shadow-xl">
+                <span className="material-symbols-outlined text-[34px]">hub</span>
+              </div>
+              <div>
+                <p className="text-2xl font-black leading-none">CONEXÃO RAPS</p>
+                <p className="mt-1 text-xs font-bold uppercase tracking-[0.28em] text-blue-100">Saúde & território</p>
+              </div>
             </div>
-            <h1 className="text-brand-dark dark:text-white text-2xl font-black tracking-tight mb-1">CONEXÃO RAPS</h1>
-            <p className="text-xs text-text-muted-light dark:text-text-muted-dark font-semibold uppercase tracking-widest opacity-80">
-              Saúde & Tecnologia
+
+            <p className="mb-5 inline-flex items-center gap-2 rounded-full bg-[#9cefde]/20 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#9cefde]">
+              <span className="material-symbols-outlined text-[18px]">shield</span>
+              Acesso institucional
+            </p>
+            <h1 className="mb-6 max-w-xl text-5xl font-black leading-tight tracking-tight">
+              Entre no ambiente seguro de monitoramento da RAPS.
+            </h1>
+            <p className="max-w-lg text-lg leading-relaxed text-blue-100">
+              O acesso ao sistema é organizado por módulos para proteger os dados, preservar a rotina de inserção e fortalecer a análise territorial.
             </p>
           </div>
 
-          <div className="flex px-8 mb-4">
-            <div className="flex w-full bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl">
+          <div className="relative grid gap-4">
+            <div className="rounded-3xl border border-white/15 bg-white/10 p-5 backdrop-blur-md">
+              <div className="mb-2 flex items-center gap-3">
+                <span className="material-symbols-outlined text-[#9cefde]">admin_panel_settings</span>
+                <p className="font-black">Cadastro com aprovação</p>
+              </div>
+              <p className="text-sm leading-relaxed text-blue-100">
+                Novas contas ficam em análise até liberação pelo administrador.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center text-xs font-black uppercase tracking-wide">
+              <div className="rounded-2xl bg-white/10 p-4">Inserção</div>
+              <div className="rounded-2xl bg-white/10 p-4">Analítico</div>
+              <div className="rounded-2xl bg-white/10 p-4">Admin</div>
+            </div>
+          </div>
+        </aside>
+
+        <section className="flex min-h-[620px] flex-col justify-center p-5 sm:min-h-[680px] sm:p-10">
+          <div className="mx-auto w-full max-w-md">
+            <div className="mb-8 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#003f81]/10 text-[#003f81]">
+                <span className="material-symbols-outlined text-[34px]">health_metrics</span>
+              </div>
+              <h2 className="text-3xl font-black tracking-tight text-[#003f81]">
+                {isLogin ? 'Acessar sistema' : 'Solicitar cadastro'}
+              </h2>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
+                {isLogin ? 'Use seu e-mail ou usuário para continuar.' : 'Sua conta será analisada antes da liberação.'}
+              </p>
+            </div>
+
+            <div className="mb-6 flex rounded-2xl bg-slate-100 p-1">
               <button
+                type="button"
                 onClick={() => {
                   setIsLogin(true);
                   setError('');
                   setSuccess('');
                 }}
-                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all duration-300 ${
-                  isLogin
-                    ? 'bg-white dark:bg-slate-700 shadow-sm text-brand-medium dark:text-brand-accent'
-                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                className={`flex-1 rounded-xl py-3 text-sm font-black transition-all ${
+                  isLogin ? 'bg-white text-[#003f81] shadow-sm' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 Login
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setIsLogin(false);
                   setError('');
                   setSuccess('');
                 }}
-                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all duration-300 ${
-                  !isLogin
-                    ? 'bg-white dark:bg-slate-700 shadow-sm text-brand-medium dark:text-brand-accent'
-                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                className={`flex-1 rounded-xl py-3 text-sm font-black transition-all ${
+                  !isLogin ? 'bg-white text-[#003f81] shadow-sm' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 Registrar
               </button>
             </div>
-          </div>
 
-          {isLogin ? (
-            <form onSubmit={handleLogin} className="flex flex-col gap-4 px-8 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 uppercase" htmlFor="username">
-                  E-mail ou Usuário
-                </label>
-                <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[20px] text-slate-400 group-focus-within:text-brand-medium transition-colors">
-                    mail
-                  </span>
+            {isLogin ? (
+              <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                <FieldLabel htmlFor="username" label="E-mail ou Usuário" />
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[20px] text-slate-400">mail</span>
                   <input
                     id="username"
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="seuemail@dominio.com ou usuário"
-                    className="w-full h-12 pl-12 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 focus:bg-white dark:focus:bg-slate-900 focus:ring-4 focus:ring-brand-medium/5 outline-none transition-all font-medium"
+                    className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 font-semibold outline-none transition-all focus:border-[#003f81] focus:bg-white focus:ring-4 focus:ring-[#003f81]/10"
                   />
                 </div>
-              </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 uppercase" htmlFor="password">
-                  Senha
-                </label>
-                <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[20px] text-slate-400 group-focus-within:text-brand-medium transition-colors">
-                    lock
-                  </span>
+                <FieldLabel htmlFor="password" label="Senha" />
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[20px] text-slate-400">lock</span>
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Sua senha"
-                    className="w-full h-12 pl-12 pr-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 focus:bg-white dark:focus:bg-slate-900 focus:ring-4 focus:ring-brand-medium/5 outline-none transition-all font-medium"
+                    className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-12 font-semibold outline-none transition-all focus:border-[#003f81] focus:bg-white focus:ring-4 focus:ring-[#003f81]/10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand-medium"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-[#003f81]"
                   >
                     <span className="material-symbols-outlined text-[20px]">{showPassword ? 'visibility_off' : 'visibility'}</span>
                   </button>
                 </div>
-              </div>
 
-              {error && <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs font-bold text-center animate-shake">{error}</div>}
-              {success && <div className="p-3 bg-green-50 border border-green-100 text-green-600 rounded-xl text-xs font-bold text-center animate-bounce-short">{success}</div>}
+                <StatusMessages error={error} success={success} />
 
-              <button
-                disabled={loading}
-                type="submit"
-                className="h-12 w-full mt-2 rounded-xl bg-brand-medium text-white font-bold shadow-lg shadow-brand-medium/20 hover:bg-brand-dark hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : (
-                  <>
-                    Acessar Painel <span className="material-symbols-outlined text-[18px]">login</span>
-                  </>
-                )}
-              </button>
-            </form>
-          ) : (
-            <form
-              onSubmit={handleRegister}
-              className="flex flex-col gap-3 px-8 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-h-[450px] overflow-y-auto no-scrollbar"
-            >
-              <div className="grid grid-cols-1 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="nomeCompleto">
-                    Nome Completo
-                  </label>
-                  <input
-                    id="nomeCompleto"
-                    value={regData.nomeCompleto}
-                    onChange={handleInputChange}
-                    className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="moduloAcesso">
-                    Módulo de Acesso
-                  </label>
-                  <select
-                    id="moduloAcesso"
-                    value={regData.moduloAcesso}
-                    onChange={handleInputChange}
-                    className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium"
-                  >
-                    <option value="INSERCAO">Inserção</option>
-                    <option value="ANALITICO">Analítico</option>
-                    <option value="INSERCAO_ANALITICO">Inserção e Analítico</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="cpf">
-                      CPF (Números)
-                    </label>
-                    <input
-                      id="cpf"
-                      maxLength={11}
-                      value={regData.cpf}
-                      onChange={handleInputChange}
-                      className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium"
-                      placeholder="00000000000"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="matricula">
-                      Matrícula
-                    </label>
-                    <input
-                      id="matricula"
-                      value={regData.matricula}
-                      onChange={handleInputChange}
-                      className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="email">
-                    E-mail
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={regData.email}
-                    onChange={handleInputChange}
-                    className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium"
-                    placeholder="seuemail@dominio.com"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="funcao">
-                    Função / Cargo
-                  </label>
-                  <input
-                    id="funcao"
-                    value={regData.funcao}
-                    onChange={handleInputChange}
-                    className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="usuario">
-                    Nome de Usuário
-                  </label>
-                  <input
-                    id="usuario"
-                    value={regData.usuario}
-                    onChange={handleInputChange}
-                    className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium uppercase"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="senha">
-                      Nova Senha
-                    </label>
-                    <input
-                      id="senha"
-                      type="password"
-                      value={regData.senha}
-                      onChange={handleInputChange}
-                      className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1" htmlFor="confirmarSenha">
-                      Confirmar
-                    </label>
-                    <input
-                      id="confirmarSenha"
-                      type="password"
-                      value={regData.confirmarSenha}
-                      onChange={handleInputChange}
-                      className="w-full h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 font-medium"
-                    />
-                  </div>
-                </div>
-              </div>
+                <button
+                  disabled={loading}
+                  type="submit"
+                  className="mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-[#003f81] to-[#0056ac] font-black text-white shadow-xl shadow-blue-900/20 transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <div className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  ) : (
+                    <>
+                      Acessar Painel <span className="material-symbols-outlined text-[18px]">login</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleRegister} className="flex max-h-[520px] flex-col gap-3 overflow-y-auto pr-1">
+                <InputField id="nomeCompleto" label="Nome Completo" value={regData.nomeCompleto} onChange={handleInputChange} />
 
-              {error && <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs font-bold text-center mt-2">{error}</div>}
-              {success && <div className="p-3 bg-green-50 border border-green-100 text-green-600 rounded-xl text-xs font-bold text-center mt-2">{success}</div>}
+                <FieldLabel htmlFor="moduloAcesso" label="Módulo de Acesso" />
+                <select
+                  id="moduloAcesso"
+                  value={regData.moduloAcesso}
+                  onChange={handleInputChange}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 font-semibold outline-none transition-all focus:border-[#003f81] focus:bg-white focus:ring-4 focus:ring-[#003f81]/10"
+                >
+                  <option value="INSERCAO">Inserção</option>
+                  <option value="ANALITICO">Analítico</option>
+                  <option value="INSERCAO_ANALITICO">Inserção e Analítico</option>
+                </select>
 
-              <button
-                disabled={loading}
-                type="submit"
-                className="h-12 w-full mt-4 rounded-xl bg-brand-medium text-white font-bold shadow-lg shadow-brand-medium/20 hover:bg-brand-dark transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Criar Minha Conta'}
-              </button>
-            </form>
-          )}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <InputField id="cpf" label="CPF (Números)" value={regData.cpf} onChange={handleInputChange} maxLength={11} placeholder="00000000000" />
+                  <InputField id="matricula" label="Matrícula" value={regData.matricula} onChange={handleInputChange} />
+                </div>
+                <InputField id="email" label="E-mail" type="email" value={regData.email} onChange={handleInputChange} placeholder="seuemail@dominio.com" />
+                <InputField id="funcao" label="Função / Cargo" value={regData.funcao} onChange={handleInputChange} />
+                <InputField id="usuario" label="Nome de Usuário" value={regData.usuario} onChange={handleInputChange} className="uppercase" />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <InputField id="senha" label="Nova Senha" type="password" value={regData.senha} onChange={handleInputChange} />
+                  <InputField id="confirmarSenha" label="Confirmar" type="password" value={regData.confirmarSenha} onChange={handleInputChange} />
+                </div>
 
-          <div className="border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/80 dark:bg-slate-800/50 px-8 py-4 text-center">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-              Desenvolvido por <span className="text-brand-medium dark:text-brand-accent">Lucivaldo Oliveira Barroso</span>
+                <StatusMessages error={error} success={success} />
+
+                <button
+                  disabled={loading}
+                  type="submit"
+                  className="mt-3 flex h-12 w-full items-center justify-center rounded-2xl bg-gradient-to-br from-[#003f81] to-[#0056ac] font-black text-white shadow-xl shadow-blue-900/20 transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                >
+                  {loading ? <div className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : 'Criar Minha Conta'}
+                </button>
+              </form>
+            )}
+
+            <p className="mt-8 text-center text-[11px] font-bold uppercase tracking-tight text-slate-400">
+              Desenvolvido por <span className="text-[#003f81]">Lucivaldo Oliveira Barroso</span>
             </p>
           </div>
-        </div>
+        </section>
       </div>
 
       {showPendingModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl border border-white/60 bg-white p-7 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-light/40 text-brand-medium">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#003f81]/10 text-[#003f81]">
               <span className="material-symbols-outlined text-[30px]">admin_panel_settings</span>
             </div>
-            <h2 className="mb-2 text-xl font-black text-brand-dark">Cadastro enviado para análise</h2>
+            <h2 className="mb-2 text-xl font-black text-[#003f81]">Cadastro enviado para análise</h2>
             <p className="mb-6 text-sm leading-relaxed text-slate-600">
               Você poderá acessar sua conta após a análise e aprovação do administrador do sistema.
             </p>
@@ -417,7 +341,7 @@ const Login: React.FC = () => {
                 setShowPendingModal(false);
                 setIsLogin(true);
               }}
-              className="h-11 w-full rounded-xl bg-brand-medium font-bold text-white shadow-lg shadow-brand-medium/20 transition-all hover:bg-brand-dark"
+              className="h-11 w-full rounded-xl bg-[#003f81] font-bold text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-[#0056ac]"
             >
               Entendi
             </button>
@@ -427,5 +351,44 @@ const Login: React.FC = () => {
     </div>
   );
 };
+
+const FieldLabel: React.FC<{ htmlFor: string; label: string }> = ({ htmlFor, label }) => (
+  <label className="ml-1 text-[11px] font-black uppercase tracking-wide text-slate-500" htmlFor={htmlFor}>
+    {label}
+  </label>
+);
+
+type InputFieldProps = {
+  id: string;
+  label: string;
+  value: string;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+  type?: string;
+  placeholder?: string;
+  maxLength?: number;
+  className?: string;
+};
+
+const InputField: React.FC<InputFieldProps> = ({ id, label, value, onChange, type = 'text', placeholder, maxLength, className = '' }) => (
+  <div className="space-y-1">
+    <FieldLabel htmlFor={id} label={label} />
+    <input
+      id={id}
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      className={`h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 font-semibold outline-none transition-all focus:border-[#003f81] focus:bg-white focus:ring-4 focus:ring-[#003f81]/10 ${className}`}
+    />
+  </div>
+);
+
+const StatusMessages: React.FC<{ error: string; success: string }> = ({ error, success }) => (
+  <>
+    {error && <div className="rounded-2xl border border-red-100 bg-red-50 p-3 text-center text-xs font-black text-red-600">{error}</div>}
+    {success && <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-center text-xs font-black text-emerald-700">{success}</div>}
+  </>
+);
 
 export default Login;

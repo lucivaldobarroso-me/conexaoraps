@@ -77,6 +77,32 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  if (!data) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-[#f8f9fa] font-display">
+        <Sidebar />
+        <main className="flex flex-1 items-center justify-center p-6">
+          <div className="max-w-lg rounded-[2rem] border border-red-100 bg-white p-8 text-center shadow-2xl shadow-slate-900/10">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <span className="material-symbols-outlined text-[34px]">error</span>
+            </div>
+            <h1 className="mb-2 text-2xl font-black text-[#003f81]">Não foi possível carregar o painel</h1>
+            <p className="mb-6 text-sm leading-relaxed text-slate-500">
+              Os dados estatísticos não foram retornados pelo Supabase. Verifique a conexão, as views do banco ou tente novamente em alguns instantes.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-2xl bg-[#003f81] px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-[#0056ac]"
+            >
+              Recarregar painel
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   // Transform Data for Charts
   const sexData = data ? [
     { name: 'Masc', value: data.masculino },

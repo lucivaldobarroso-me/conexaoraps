@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
+import LandingPage from './components/Landing/LandingPage';
 import Dashboard from './components/Dashboard/Dashboard';
 import InsertionForm from './components/Dashboard/InsertionForm';
 import { api } from './services/api';
@@ -8,9 +9,19 @@ import { supabase } from './services/supabase';
 import type { User } from './types';
 import { rotaInicialPorModulo, temPermissao, type AcaoAcesso } from './utils/permissoesAcesso';
 
-const ProtectedRoute: React.FC<{ user: User | null; required: AcaoAcesso; children: React.ReactNode }> = ({ user, required, children }) => {
+const AuthLoading = () => (
+  <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-600">
+    Carregando autenticacao...
+  </div>
+);
+
+const ProtectedRoute: React.FC<{ authReady: boolean; user: User | null; required: AcaoAcesso; children: React.ReactNode }> = ({ authReady, user, required, children }) => {
+  if (!authReady) {
+    return <AuthLoading />;
+  }
+
   if (!user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   if (!temPermissao(user, required)) {
@@ -64,21 +75,15 @@ const App: React.FC = () => {
     };
   }, []);
 
-  if (!authReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-600">
-        Carregando autenticação...
-      </div>
-    );
-  }
 
   return (
     <HashRouter>
       <Routes>
-        <Route path="/" element={authenticated ? <Navigate to={rotaInicialPorModulo(currentUser)} replace /> : <Login />} />
-        <Route path="/dashboard" element={<ProtectedRoute user={currentUser} required="analitico"><Dashboard /></ProtectedRoute>} />
-        <Route path="/insertion" element={<ProtectedRoute user={currentUser} required="insercao"><InsertionForm /></ProtectedRoute>} />
-        {/* Fallback to Login */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={authReady && authenticated ? <Navigate to={rotaInicialPorModulo(currentUser)} replace /> : <Login />} />
+        <Route path="/dashboard" element={<ProtectedRoute authReady={authReady} user={currentUser} required="analitico"><Dashboard /></ProtectedRoute>} />
+        <Route path="/insertion" element={<ProtectedRoute authReady={authReady} user={currentUser} required="insercao"><InsertionForm /></ProtectedRoute>} />
+        {/* Fallback to public home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>

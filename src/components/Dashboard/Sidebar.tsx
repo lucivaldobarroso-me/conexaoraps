@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+﻿import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { User } from '../../types';
 import { rotuloModuloAcesso, temPermissao } from '../../utils/permissoesAcesso';
@@ -25,127 +25,151 @@ const Sidebar: React.FC = () => {
   }, []);
 
   const isActive = (path: string) => location.pathname === path;
-
-  // Navigation is visible for all logged in users
   const hasAccess = !!user;
+
+  const handleNavigate = (path: string) => {
+    navigate(path);
+    setIsMobileMenuOpen(false);
+  };
 
   return (
     <>
-      {/* Mobile Toggle Button */}
       <button
+        type="button"
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="fixed top-4 left-4 z-50 p-2 bg-[#003366] text-white rounded-lg md:hidden shadow-lg border border-white/20"
+        className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#003f81] text-white shadow-xl shadow-blue-900/20 md:hidden"
       >
-        <span className="material-symbols-outlined">
-          {isMobileMenuOpen ? 'close' : 'menu'}
-        </span>
+        <span className="material-symbols-outlined">{isMobileMenuOpen ? 'close' : 'menu'}</span>
       </button>
 
-      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* Sidebar Desktop & Mobile */}
       <aside
-        className={`fixed md:relative z-40 h-full bg-[#003366] text-white flex flex-col shadow-xl transition-all duration-300 overflow-hidden 
-                ${isMobileMenuOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'} 
-                ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}
+        className={`fixed md:relative z-40 flex h-full flex-col overflow-hidden border-r border-slate-200/80 bg-white text-slate-800 shadow-2xl shadow-slate-900/10 transition-all duration-300
+          ${isMobileMenuOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0'}
+          ${isCollapsed ? 'md:w-24' : 'md:w-72'}`}
       >
-        {/* Collapse Toggle for Desktop */}
+        <div className="pointer-events-none absolute left-[-7rem] top-[-8rem] h-72 w-72 rounded-full bg-[#9cefde]/45 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-[-9rem] right-[-8rem] h-80 w-80 rounded-full bg-blue-100 blur-3xl" />
+
         <button
+          type="button"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="hidden md:flex absolute top-6 right-2 z-30 size-8 items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors border border-white/10"
+          className="absolute right-3 top-6 z-30 hidden h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-[#003f81] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md md:flex"
+          title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
         >
-          <span className="material-symbols-outlined text-[20px] transition-transform duration-300" style={{ transform: isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+          <span
+            className="material-symbols-outlined text-[20px] transition-transform"
+            style={{ transform: isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          >
             chevron_left
           </span>
         </button>
 
-        <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-
-        <div className="h-24 flex items-center gap-3 px-6 shrink-0 z-10 overflow-hidden">
-          <div className="size-10 min-w-[40px] rounded-xl bg-white flex items-center justify-center text-[#003366] shadow-lg shadow-black/10">
-            <span className="material-symbols-outlined text-[24px]">hub</span>
+        <div className="relative z-10 flex h-28 items-center gap-3 px-6">
+          <div className="flex h-12 min-w-[48px] items-center justify-center rounded-2xl bg-[#003f81] text-white shadow-xl shadow-blue-900/20">
+            <span className="material-symbols-outlined text-[28px]">hub</span>
           </div>
           {!isCollapsed && (
-            <div className="flex flex-col whitespace-nowrap animate-in fade-in duration-500">
-              <h1 className="text-white text-lg font-bold leading-none tracking-wide">CONEXÃO RAPS</h1>
-              <span className="text-white/60 text-[10px] mt-1 font-medium">Painel de Gestão</span>
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-black leading-none tracking-tight text-[#003f81]">CONEXÃO RAPS</h1>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Gestão territorial</p>
             </div>
           )}
         </div>
 
-        <nav className="flex-1 px-3 space-y-1.5 z-10">
+        <nav className="relative z-10 flex-1 space-y-2 px-4">
           {!isCollapsed && (
-            <div className="text-white/40 text-[11px] font-bold uppercase tracking-wider px-4 mb-2 mt-2">Menu Principal</div>
+            <div className="px-3 pb-2 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Menu principal</div>
           )}
 
           {hasAccess && (
             <>
               {temPermissao(user, 'analitico') && (
-                <button
-                  onClick={() => { navigate('/dashboard'); setIsMobileMenuOpen(false); }}
-                  title={isCollapsed ? 'Módulo Analítico' : ''}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group w-full text-left overflow-hidden ${isActive('/dashboard') ? 'bg-white/15 text-white shadow-lg shadow-black/5 ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
-                >
-                  <span className="material-symbols-outlined min-w-[24px]">dashboard</span>
-                  {!isCollapsed && <span className="font-medium whitespace-nowrap">Módulo Analítico</span>}
-                </button>
+                <SidebarButton
+                  active={isActive('/dashboard')}
+                  collapsed={isCollapsed}
+                  icon="dashboard"
+                  label="Módulo Analítico"
+                  onClick={() => handleNavigate('/dashboard')}
+                />
               )}
 
               {temPermissao(user, 'insercao') && (
-                <button
-                  onClick={() => { navigate('/insertion'); setIsMobileMenuOpen(false); }}
-                  title={isCollapsed ? 'Nova Inserção' : ''}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group w-full text-left overflow-hidden ${isActive('/insertion') ? 'bg-white/15 text-white shadow-lg shadow-black/5 ring-1 ring-white/20' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
-                >
-                  <span className="material-symbols-outlined min-w-[24px]">add_circle</span>
-                  {!isCollapsed && <span className="font-medium whitespace-nowrap">Nova Inserção</span>}
-                </button>
+                <SidebarButton
+                  active={isActive('/insertion')}
+                  collapsed={isCollapsed}
+                  icon="post_add"
+                  label="Nova Inserção"
+                  onClick={() => handleNavigate('/insertion')}
+                />
               )}
             </>
           )}
+        </nav>
 
-          <div className="mt-auto"></div>
+        <div className="relative z-10 space-y-4 border-t border-slate-200/80 bg-slate-50/80 p-4">
+          <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="flex h-11 min-w-[44px] items-center justify-center rounded-2xl bg-[#003f81]/10 text-sm font-black text-[#003f81]">
+              {user?.nome ? user.nome.charAt(0) : 'U'}
+            </div>
+            {!isCollapsed && (
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-black text-slate-800" title={user?.nome || 'Usuário'}>
+                  {user?.nome || 'Usuário Logado'}
+                </p>
+                <p className="truncate text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  {rotuloModuloAcesso(user?.modulo)} · {user?.funcao || 'Acesso'}
+                </p>
+              </div>
+            )}
+          </div>
 
           <button
+            type="button"
             onClick={async () => {
               await api.logout();
               navigate('/');
             }}
             title={isCollapsed ? 'Sair' : ''}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/70 hover:bg-red-500/20 hover:text-red-300 transition-all w-full text-left mt-4 group overflow-hidden"
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-left font-black text-red-600 transition-all hover:-translate-y-0.5 hover:bg-red-100"
           >
             <span className="material-symbols-outlined min-w-[24px]">logout</span>
-            {!isCollapsed && <span className="font-medium whitespace-nowrap transition-all duration-300">Sair do Sistema</span>}
+            {!isCollapsed && <span className="whitespace-nowrap text-sm">Sair do Sistema</span>}
           </button>
-        </nav>
-
-        <div className="p-4 border-t border-white/10 bg-black/20 z-10 overflow-hidden">
-          <div className="flex items-center gap-3 w-full">
-            <div className="size-10 min-w-[40px] rounded-full bg-cover bg-center border-2 border-white/20 shadow-md bg-white flex items-center justify-center text-[#003366] font-bold">
-              {user?.nome ? user.nome.charAt(0) : 'U'}
-            </div>
-            {!isCollapsed && (
-              <div className="flex flex-col min-w-0 flex-1 overflow-hidden animate-in fade-in duration-500">
-                <span className="text-sm font-bold text-white leading-tight break-words overflow-visible" title={user?.nome || 'Usuário'}>
-                  {user?.nome || 'Usuário Logado'}
-                </span>
-                <span className="text-[10px] text-white/60 font-semibold uppercase tracking-wider truncate">
-                  {rotuloModuloAcesso(user?.modulo)} · {user?.funcao || 'Acesso'}
-                </span>
-              </div>
-            )}
-          </div>
         </div>
       </aside>
     </>
   );
 };
 
-export default Sidebar;
+type SidebarButtonProps = {
+  active: boolean;
+  collapsed: boolean;
+  icon: string;
+  label: string;
+  onClick: () => void;
+};
 
+const SidebarButton: React.FC<SidebarButtonProps> = ({ active, collapsed, icon, label, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={collapsed ? label : ''}
+    className={`group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all ${
+      active
+        ? 'bg-[#003f81] text-white shadow-xl shadow-blue-900/20'
+        : 'text-slate-500 hover:-translate-y-0.5 hover:bg-[#003f81]/10 hover:text-[#003f81]'
+    } ${collapsed ? 'justify-center' : ''}`}
+  >
+    <span className="material-symbols-outlined min-w-[24px] text-[24px]">{icon}</span>
+    {!collapsed && <span className="whitespace-nowrap text-sm font-black">{label}</span>}
+  </button>
+);
+
+export default Sidebar;

@@ -125,7 +125,7 @@ export const loadEstatisticas = async (): Promise<DashboardData | null> => {
     if (error) throw error;
     return buildStatsFromRows(data ?? []);
   } catch (e) {
-    console.error('Erro ao carregar estatÃ­sticas do Supabase:', e);
+    console.error('Erro ao carregar estatísticas do Supabase:', e);
     return null;
   }
 };

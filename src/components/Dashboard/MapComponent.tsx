@@ -121,13 +121,13 @@ export const MapComponent: React.FC<MapProps> = ({ data, occurrenceDetails = {} 
     };
 
     const icons = {
-        samu: 'http://maps.google.com/mapfiles/kml/shapes/ambulance.png',
-        ubs: 'http://maps.google.com/mapfiles/kml/shapes/hospitals.png',
-        caps: 'http://maps.google.com/mapfiles/kml/shapes/plus.png',
+        samu: 'https://maps.google.com/mapfiles/kml/shapes/ambulance.png',
+        ubs: 'https://maps.google.com/mapfiles/kml/shapes/hospitals.png',
+        caps: 'https://maps.google.com/mapfiles/kml/shapes/plus.png',
         patient: {
-            red: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-            yellow: 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-            green: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+            red: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+            yellow: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+            green: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'
         }
     };
 
@@ -210,7 +210,7 @@ export const MapComponent: React.FC<MapProps> = ({ data, occurrenceDetails = {} 
 
     return (
         <div className="relative h-full w-full">
-            <div className="absolute top-4 right-4 z-10 flex gap-2 rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-lg backdrop-blur-sm">
+            <div className="absolute right-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] gap-2 rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-lg backdrop-blur-sm sm:right-4 sm:top-4">
                 <button
                     onClick={() => setShowHeatmap(false)}
                     className={`rounded px-3 py-1 text-xs font-bold ${!showHeatmap ? 'bg-[#003366] text-white' : 'bg-gray-200 text-gray-600'}`}
@@ -277,7 +277,7 @@ export const MapComponent: React.FC<MapProps> = ({ data, occurrenceDetails = {} 
             </GoogleMap>
 
             {selectedMarker && (
-                <div className="absolute bottom-4 left-4 z-20 w-80 animate-fade-in-up rounded-xl border-l-4 border-brand-medium bg-white p-4 shadow-card">
+                <div className="absolute bottom-3 left-3 right-3 z-20 max-h-[70%] max-w-sm animate-fade-in-up overflow-y-auto rounded-xl border-l-4 border-brand-medium bg-white p-4 shadow-card sm:bottom-4 sm:left-4 sm:right-auto sm:w-80">
                     <div className="mb-2 flex items-start justify-between">
                         <h3 className="text-lg font-bold text-brand-dark">{selectedMarker.fullData.id}</h3>
                         <button onClick={() => setSelectedMarker(null)} className="text-gray-400 hover:text-gray-600">

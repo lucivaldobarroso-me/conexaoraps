@@ -179,13 +179,13 @@ comment on view public.vw_ocorrencias_psi_zona_motivo is
 -- ajustar se for mudar o modelo de seguranca depois
 -- =========================================================
 
-grant select on public.vw_ocorrencias_psi_detalhado to anon, authenticated;
-grant select on public.vw_ocorrencias_psi_resumo_geral to anon, authenticated;
-grant select on public.vw_ocorrencias_psi_motivos_iniciais to anon, authenticated;
-grant select on public.vw_ocorrencias_psi_motivos_constatados to anon, authenticated;
-grant select on public.vw_ocorrencias_psi_transicoes to anon, authenticated;
-grant select on public.vw_ocorrencias_psi_metodos_tentativa to anon, authenticated;
-grant select on public.vw_ocorrencias_psi_zona_motivo to anon, authenticated;
+grant select on public.vw_ocorrencias_psi_detalhado to authenticated;
+grant select on public.vw_ocorrencias_psi_resumo_geral to authenticated;
+grant select on public.vw_ocorrencias_psi_motivos_iniciais to authenticated;
+grant select on public.vw_ocorrencias_psi_motivos_constatados to authenticated;
+grant select on public.vw_ocorrencias_psi_transicoes to authenticated;
+grant select on public.vw_ocorrencias_psi_metodos_tentativa to authenticated;
+grant select on public.vw_ocorrencias_psi_zona_motivo to authenticated;
 
 -- =========================================================
 -- 9. CHECKS RAPIDOS

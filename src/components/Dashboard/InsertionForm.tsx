@@ -1137,7 +1137,7 @@ const InsertionForm: React.FC = () => {
     return (
         <div className="flex h-screen bg-[#f3f4f6] dark:bg-background-dark overflow-hidden font-body">
             <Sidebar />
-            <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto p-4 md:p-8">
+            <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto p-4 pt-16 md:p-8">
 
                 <div className="max-w-4xl mx-auto w-full bg-white dark:bg-card-dark rounded-xl shadow-card border-t-[6px] border-brand-dark p-6 md:p-8 relative">
 
