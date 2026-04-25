@@ -172,6 +172,15 @@ export interface DadosProfissionaisCatalogo {
   tecnico_enfermagem: string[];
 }
 
+export interface IndicadoresEstudoPayload {
+  uso_alcool: string;
+  uso_drogas: string;
+  presenca_familiar: string;
+  situacao_familiar: string;
+  nivel_consciencia: string;
+  risco_agressao: string;
+}
+
 export interface SamuAttendancePayload {
   id_paciente?: string;
   nome: string;
@@ -197,12 +206,66 @@ export interface SamuAttendancePayload {
   nacionalidade: string;
   classificacao_ocorrencia?: SamuOccurrenceClassificationPayload | null;
   dados_profissionais?: DadosProfissionaisPayload | null;
+  indicadores_estudo?: IndicadoresEstudoPayload | null;
 }
 
 export interface SaveSamuAttendanceResult {
   result: 'success' | 'error';
   id?: string;
   message?: string;
+}
+
+export interface IndicadoresEstudoRecord {
+  atendimento_id: string;
+  id_externo: string;
+  nome: string;
+  nascimento: string | null;
+  sexo: string | null;
+  idade: number | null;
+  bairro: string | null;
+  zona: string | null;
+  reincidente: string | null;
+  medicacao: string | null;
+  apoio_fam: string | null;
+  apoio_raps: string | null;
+  data_atendimento: string | null;
+  encaminhado: string | null;
+  contencao_fisica: string | null;
+  contencao_quimica: string | null;
+  medicacao_contencao_quimica: string | null;
+  classe_farmaco_contencao?: string | null;
+  tem_benzodiazepinico?: number;
+  tem_antipsicotico?: number;
+  sinais_vitais: string | null;
+  vtr: string | null;
+  j9_inicio: string | null;
+  j10_inicio: string | null;
+  motivo_constatado: string | null;
+  uso_alcool: string | null;
+  uso_drogas: string | null;
+  presenca_familiar: string | null;
+  situacao_familiar?: string | null;
+  nivel_consciencia: string | null;
+  risco_agressao: string | null;
+  contencao_fisica_bin: number;
+  contencao_quimica_bin: number;
+  tipo_contencao_codigo: number;
+  tipo_contencao: string;
+  uso_alcool_bin: number;
+  uso_drogas_bin: number;
+  familiar_presente_bin: number;
+  risco_agressao_bin: number;
+  gravidade_clinica_codigo?: number;
+  gravidade_clinica?: string;
+  fatores_vulnerabilidade?: number;
+  informacoes_vulnerabilidade?: number;
+  qualidade_vulnerabilidade?: string;
+  vulnerabilidade_composta_codigo?: number;
+  vulnerabilidade_composta?: string;
+  turno: string;
+  numero_atendimentos_paciente: number;
+  reincidencia_bin: number;
+  porta_giratoria_bin: number;
 }
 
 export interface LegacyPatientLookupData {

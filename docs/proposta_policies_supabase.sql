@@ -16,7 +16,7 @@ grant select on public.bairros to authenticated;
 grant select on public.tipos_ocorrencia to authenticated;
 grant select on public.subtipos_ocorrencia to authenticated;
 grant select on public.campos_extras_ocorrencia to authenticated;
-grant select, insert on public.atendimentos_raps to authenticated;
+grant select, insert, update on public.atendimentos_raps to authenticated;
 grant select, insert, update on public.classificacao_ocorrencia_atendimento to authenticated;
 grant select, insert, update on public.catalogo_dados_profissionais to authenticated;
 grant select, insert, update on public.dados_profissionais_atendimento to authenticated;
@@ -33,6 +33,72 @@ alter table public.classificacao_ocorrencia_atendimento enable row level securit
 alter table public.catalogo_dados_profissionais enable row level security;
 alter table public.dados_profissionais_atendimento enable row level security;
 
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.usuarios u
+    where u.auth_user_id = auth.uid()
+      and u.ativo = true
+      and u.status_aprovacao = 'aprovado'
+      and upper(coalesce(u.modulo, '')) in ('ADMINISTRADOR', 'ADMIN')
+  );
+$$;
+
+revoke all on function public.is_admin() from public;
+grant execute on function public.is_admin() to authenticated;
+
+-- =========================================================
+-- CAMPOS DE INATIVACAO ADMINISTRATIVA
+-- =========================================================
+
+alter table public.atendimentos_raps
+  add column if not exists inativado_em timestamptz null,
+  add column if not exists inativado_por uuid null,
+  add column if not exists motivo_inativacao text null;
+
+create index if not exists idx_atendimentos_raps_inativado_em
+  on public.atendimentos_raps(inativado_em);
+
+-- =========================================================
+-- AUDITORIA ADMINISTRATIVA
+-- =========================================================
+
+create table if not exists public.admin_auditoria (
+  id uuid primary key default gen_random_uuid(),
+  admin_auth_user_id uuid null,
+  acao text not null,
+  entidade text not null,
+  entidade_id text not null,
+  resumo text not null,
+  antes jsonb null,
+  depois jsonb null,
+  criado_em timestamptz not null default now()
+);
+
+alter table public.admin_auditoria enable row level security;
+
+grant select, insert on public.admin_auditoria to authenticated;
+revoke update, delete on public.admin_auditoria from authenticated;
+
+drop policy if exists "admin_auditoria_select_admin" on public.admin_auditoria;
+create policy "admin_auditoria_select_admin"
+on public.admin_auditoria
+for select
+to authenticated
+using (public.is_admin());
+
+drop policy if exists "admin_auditoria_insert_admin" on public.admin_auditoria;
+create policy "admin_auditoria_insert_admin"
+on public.admin_auditoria
+for insert
+to authenticated
+with check (public.is_admin());
+
 drop policy if exists "usuarios_select_login_lookup" on public.usuarios;
 
 drop policy if exists "usuarios_select_own" on public.usuarios;
@@ -40,7 +106,7 @@ create policy "usuarios_select_own"
 on public.usuarios
 for select
 to authenticated
-using (auth.uid() = auth_user_id);
+using (auth.uid() = auth_user_id or public.is_admin());
 
 drop policy if exists "usuarios_insert_own" on public.usuarios;
 create policy "usuarios_insert_own"
@@ -56,6 +122,14 @@ for update
 to authenticated
 using (auth.uid() = auth_user_id)
 with check (auth.uid() = auth_user_id);
+
+drop policy if exists "usuarios_update_admin" on public.usuarios;
+create policy "usuarios_update_admin"
+on public.usuarios
+for update
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
 
 drop policy if exists "zonas_select_public" on public.zonas;
 create policy "zonas_select_public"
@@ -106,12 +180,16 @@ for insert
 to authenticated
 with check (true);
 
-drop policy if exists "atendimentos_raps_delete_public" on public.atendimentos_raps;
-create policy "atendimentos_raps_delete_public"
+drop policy if exists "atendimentos_raps_update_admin" on public.atendimentos_raps;
+create policy "atendimentos_raps_update_admin"
 on public.atendimentos_raps
-for delete
+for update
 to authenticated
-using (true);
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "atendimentos_raps_delete_public" on public.atendimentos_raps;
+drop policy if exists "atendimentos_raps_delete_admin" on public.atendimentos_raps;
 
 drop policy if exists "classificacao_ocorrencia_select_public" on public.classificacao_ocorrencia_atendimento;
 create policy "classificacao_ocorrencia_select_public"

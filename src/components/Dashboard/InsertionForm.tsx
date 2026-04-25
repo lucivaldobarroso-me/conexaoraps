@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 import DadosProfissionais, { type DadosProfissionaisFormState } from './DadosProfissionais';
+import IndicadoresEstudoSection from './IndicadoresEstudoSection';
 import Sidebar from './Sidebar';
 import { api } from '../../services/api';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
@@ -11,6 +12,7 @@ import type {
     OccurrenceExtraValue,
     OccurrenceExtraDefinition,
     PatientLookupResult,
+    IndicadoresEstudoPayload,
     SamuAttendancePayload
 } from '../../types';
 
@@ -307,6 +309,14 @@ const InsertionForm: React.FC = () => {
         medicoOutro: '',
         tecnicoEnfermagemOutro: ''
     });
+    const [indicadoresEstudo, setIndicadoresEstudo] = useState<IndicadoresEstudoPayload>({
+        uso_alcool: '',
+        uso_drogas: '',
+        presenca_familiar: '',
+        situacao_familiar: '',
+        nivel_consciencia: '',
+        risco_agressao: ''
+    });
 
     // Form State
     const [formData, setFormData] = useState({
@@ -328,11 +338,11 @@ const InsertionForm: React.FC = () => {
         ref: '',
         diag: '',
         reinc: '',
-        med: 'Sim',
+        med: '',
         pq_med: '',
-        fam: 'Sim',
+        fam: '',
         pq_fam: '',
-        raps: 'Não',
+        raps: '',
         info: ''
     });
 
@@ -1066,7 +1076,8 @@ const InsertionForm: React.FC = () => {
                         campos_definicao: getExtras(occurrence.motivoConstatado.subtipoId)
                     },
                     detalhe_livre: occurrence.detalheLivre
-                }
+                },
+                indicadores_estudo: indicadoresEstudo
             };
 
             const data = await api.salvarSamu(payload);
@@ -1436,6 +1447,11 @@ const InsertionForm: React.FC = () => {
                             </div>
                         </div>
 
+                        <IndicadoresEstudoSection
+                            value={indicadoresEstudo}
+                            onChange={setIndicadoresEstudo}
+                        />
+
                         {/* Diagnostico & Reincidente */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -1462,6 +1478,7 @@ const InsertionForm: React.FC = () => {
                             <div>
                                 <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Utiliza Medicação</label>
                                 <select id="med" value={formData.med} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
+                                    <option value="">Selecione</option>
                                     <option>Sim</option>
                                     <option>Não</option>
                                     <option>Não Informado</option>
@@ -1480,6 +1497,7 @@ const InsertionForm: React.FC = () => {
                             <div>
                                 <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Tem Apoio Familiar</label>
                                 <select id="fam" value={formData.fam} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
+                                    <option value="">Selecione</option>
                                     <option>Sim</option>
                                     <option>Não</option>
                                     <option>Não Informado</option>
@@ -1503,6 +1521,7 @@ const InsertionForm: React.FC = () => {
                         <div>
                             <label className="block text-brand-dark dark:text-white font-semibold text-sm mb-1">Tem Apoio da RAPS</label>
                             <select id="raps" value={formData.raps} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-medium">
+                                <option value="">Selecione</option>
                                 <option>Não</option>
                                 <option>Sim</option>
                                 <option>Não Informado</option>

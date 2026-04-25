@@ -49,6 +49,7 @@ export const temPermissao = (user: Pick<User, 'modulo'> | null | undefined, acao
 };
 
 export const rotaInicialPorModulo = (user: Pick<User, 'modulo'> | null | undefined) => {
+  if (temPermissao(user, 'administracao')) return '/admin';
   if (temPermissao(user, 'analitico')) return '/dashboard';
   if (temPermissao(user, 'insercao')) return '/insertion';
   return '/';

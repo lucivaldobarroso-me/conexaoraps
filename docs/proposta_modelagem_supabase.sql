@@ -101,6 +101,9 @@ create table if not exists public.atendimentos_raps (
   responsavel_nome text null,
   raca text null,
   nacionalidade text null,
+  inativado_em timestamptz null,
+  inativado_por uuid null,
+  motivo_inativacao text null,
   usuario_id uuid null references public.usuarios(id) on delete set null,
   origem_dado text not null default 'sheets',
   criado_em timestamptz not null default now(),
@@ -114,6 +117,7 @@ create index if not exists idx_atendimentos_criado_em on public.atendimentos_rap
 create index if not exists idx_atendimentos_reincidente on public.atendimentos_raps(reincidente);
 create index if not exists idx_atendimentos_apoio_raps on public.atendimentos_raps(apoio_raps);
 create index if not exists idx_atendimentos_lat_lng on public.atendimentos_raps(latitude, longitude);
+create index if not exists idx_atendimentos_inativado_em on public.atendimentos_raps(inativado_em);
 
 -- =========================================================
 -- 4. TIPOS / SUBTIPOS / CAMPOS EXTRAS DE OCORRENCIA
@@ -338,7 +342,8 @@ select
   a.nacionalidade
 from public.atendimentos_raps a
 left join public.bairros b on b.id = a.bairro_id
-left join public.zonas z on z.id = a.zona_id;
+left join public.zonas z on z.id = a.zona_id
+where a.inativado_em is null;
 
 -- =========================================================
 -- 10. OBSERVACOES DE MIGRACAO

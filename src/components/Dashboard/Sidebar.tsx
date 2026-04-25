@@ -90,6 +90,16 @@ const Sidebar: React.FC = () => {
 
           {hasAccess && (
             <>
+              {temPermissao(user, 'administracao') && (
+                <SidebarButton
+                  active={isActive('/admin')}
+                  collapsed={isCollapsed}
+                  icon="admin_panel_settings"
+                  label="Administração"
+                  onClick={() => handleNavigate('/admin')}
+                />
+              )}
+
               {temPermissao(user, 'analitico') && (
                 <SidebarButton
                   active={isActive('/dashboard')}
@@ -97,6 +107,16 @@ const Sidebar: React.FC = () => {
                   icon="dashboard"
                   label="Módulo Analítico"
                   onClick={() => handleNavigate('/dashboard')}
+                />
+              )}
+
+              {temPermissao(user, 'analitico') && (
+                <SidebarButton
+                  active={isActive('/indicadores-estudo')}
+                  collapsed={isCollapsed}
+                  icon="query_stats"
+                  label="Indicadores do Estudo"
+                  onClick={() => handleNavigate('/indicadores-estudo')}
                 />
               )}
 

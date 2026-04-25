@@ -7,6 +7,7 @@ import {
 } from './apiHelpers';
 import type {
   DadosProfissionaisPayload,
+  IndicadoresEstudoPayload,
   SamuAttendancePayload,
   SaveSamuAttendanceResult,
   TipoCatalogoDadosProfissionais
@@ -50,6 +51,16 @@ const possuiDadosProfissionais = (dados?: DadosProfissionaisPayload | null) =>
     dados?.j10_inicio ||
     dados?.j9_fim ||
     dados?.j10_fim
+  );
+
+const possuiIndicadoresEstudo = (dados?: IndicadoresEstudoPayload | null) =>
+  Boolean(
+    dados?.uso_alcool ||
+    dados?.uso_drogas ||
+    dados?.presenca_familiar ||
+    dados?.situacao_familiar ||
+    dados?.nivel_consciencia ||
+    dados?.risco_agressao
   );
 
 const salvarItemCatalogoDadosProfissionais = async (
@@ -123,6 +134,27 @@ const salvarDadosProfissionaisAtendimento = async (
       j10_inicio: dados.j10_inicio || null,
       j9_fim: dados.j9_fim || null,
       j10_fim: dados.j10_fim || null
+    }, { onConflict: 'atendimento_id' });
+
+  if (error) throw error;
+};
+
+const salvarIndicadoresEstudoAtendimento = async (
+  atendimentoId: string,
+  dados: IndicadoresEstudoPayload
+) => {
+  if (!possuiIndicadoresEstudo(dados)) return;
+
+  const { error } = await supabase
+    .from('indicadores_estudo_atendimento')
+    .upsert({
+      atendimento_id: atendimentoId,
+      uso_alcool: normalizeText(dados.uso_alcool) || null,
+      uso_drogas: normalizeText(dados.uso_drogas) || null,
+      presenca_familiar: normalizeText(dados.presenca_familiar) || null,
+      situacao_familiar: normalizeText(dados.situacao_familiar) || null,
+      nivel_consciencia: normalizeText(dados.nivel_consciencia) || null,
+      risco_agressao: normalizeText(dados.risco_agressao) || null
     }, { onConflict: 'atendimento_id' });
 
   if (error) throw error;
@@ -271,6 +303,14 @@ export const saveSamuAttendance = async (payload: SamuAttendancePayload): Promis
         await salvarDadosProfissionaisAtendimento(data.id, payload.dados_profissionais);
       } catch (dadosProfissionaisError: any) {
         console.warn('Não foi possível salvar os dados profissionais do atendimento.', dadosProfissionaisError);
+      }
+    }
+
+    if (payload.indicadores_estudo && data?.id) {
+      try {
+        await salvarIndicadoresEstudoAtendimento(data.id, payload.indicadores_estudo);
+      } catch (indicadoresEstudoError: any) {
+        console.warn('Nao foi possivel salvar os indicadores do estudo do atendimento.', indicadoresEstudoError);
       }
     }
 
